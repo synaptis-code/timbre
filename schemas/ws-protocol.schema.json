@@ -1,0 +1,127 @@
+{
+  "client": {
+    "additionalProperties": false,
+    "description": "Client → serveur : texte saisi (ou transcrit, à partir de la Phase 4).",
+    "properties": {
+      "text": {
+        "minLength": 1,
+        "title": "Text",
+        "type": "string"
+      },
+      "type": {
+        "const": "user_message",
+        "default": "user_message",
+        "title": "Type",
+        "type": "string"
+      }
+    },
+    "required": [
+      "text"
+    ],
+    "title": "UserMessage",
+    "type": "object"
+  },
+  "server": {
+    "$defs": {
+      "AiChunk": {
+        "description": "Serveur → client : fragment de réponse en streaming. `last=True` clôt le tour.",
+        "properties": {
+          "last": {
+            "default": false,
+            "title": "Last",
+            "type": "boolean"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "const": "ai_chunk",
+            "default": "ai_chunk",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "AiChunk",
+        "type": "object"
+      },
+      "AppState": {
+        "enum": [
+          "idle",
+          "listening",
+          "thinking",
+          "speaking"
+        ],
+        "title": "AppState",
+        "type": "string"
+      },
+      "ErrorMessage": {
+        "description": "Serveur → client : erreur toujours visible, jamais avalée.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "const": "error",
+            "default": "error",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorMessage",
+        "type": "object"
+      },
+      "StateChange": {
+        "description": "Serveur → client : nouvel état de l'assistant.",
+        "properties": {
+          "state": {
+            "$ref": "#/$defs/AppState"
+          },
+          "type": {
+            "const": "state_change",
+            "default": "state_change",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "StateChange",
+        "type": "object"
+      }
+    },
+    "discriminator": {
+      "mapping": {
+        "ai_chunk": "#/$defs/AiChunk",
+        "error": "#/$defs/ErrorMessage",
+        "state_change": "#/$defs/StateChange"
+      },
+      "propertyName": "type"
+    },
+    "oneOf": [
+      {
+        "$ref": "#/$defs/AiChunk"
+      },
+      {
+        "$ref": "#/$defs/StateChange"
+      },
+      {
+        "$ref": "#/$defs/ErrorMessage"
+      }
+    ]
+  },
+  "title": "Protocole WebSocket Timbre"
+}
