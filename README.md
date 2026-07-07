@@ -9,7 +9,7 @@ Assistant vocal IA **100 % local** et open source : vous parlez, l'IA comprend, 
 - **Windows** (support Linux/Mac prévu), GPU NVIDIA recommandé pour les phases ASR/TTS.
 - **Python ≥ 3.12** et [uv](https://docs.astral.sh/uv/).
 - **Node.js ≥ 20** (pour l'UI).
-- **[LM Studio](https://lmstudio.ai/)** servant un modèle sur `http://localhost:1234/v1` (requis à partir de la Phase 2).
+- **[LM Studio](https://lmstudio.ai/)** avec le serveur local démarré (`lms server start`) et un modèle chargé. **Timbre détecte et utilise automatiquement le modèle chargé** — changer de modèle dans LM Studio suffit, aucun réglage à faire (forçage possible via `TIMBRE_LLM_MODEL`).
 
 ## Démarrage
 
@@ -60,7 +60,7 @@ Le protocole WebSocket (messages `user_message`, `ai_chunk`, `state_change`, `er
 | Phase | Contenu | État |
 |---|---|---|
 | 1 | Squelette : WebSocket typé, UI d'état, test d'intégration | ✅ |
-| 2 | LLM : streaming LM Studio dans le fil de conversation | ⏳ |
+| 2 | LLM : streaming LM Studio, modèle chargé auto-détecté | ✅ |
 | 3 | TTS : synthèse vocale streaming phrase par phrase | ⏳ |
 | 4 | ASR + VAD : boucle vocale complète | ⏳ |
 | 5 | Anti-feedback + états mains-libres | ⏳ |

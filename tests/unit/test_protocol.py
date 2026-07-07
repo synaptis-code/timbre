@@ -5,6 +5,7 @@ import pytest
 from timbre.protocol.messages import (
     AiChunk,
     ErrorMessage,
+    ModelInfo,
     ProtocolError,
     StateChange,
     UserMessage,
@@ -44,6 +45,7 @@ def test_server_messages_serialize_with_discriminator():
     assert StateChange(state=AppState.LISTENING).model_dump()["type"] == "state_change"
     assert AiChunk(text="salut", last=True).model_dump()["type"] == "ai_chunk"
     assert ErrorMessage(code="x", message="y").model_dump()["type"] == "error"
+    assert ModelInfo(model="qwen").model_dump()["type"] == "model_info"
 
 
 def test_state_change_serializes_enum_as_string():

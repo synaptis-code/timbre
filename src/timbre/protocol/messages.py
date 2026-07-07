@@ -50,7 +50,16 @@ class ErrorMessage(BaseModel):
     message: str
 
 
-ServerMessage = Annotated[AiChunk | StateChange | ErrorMessage, Field(discriminator="type")]
+class ModelInfo(BaseModel):
+    """Serveur → client : modèle LLM actif (détecté automatiquement dans LM Studio)."""
+
+    type: Literal["model_info"] = "model_info"
+    model: str
+
+
+# Union nue pour typer les paramètres ; version annotée pour la (dé)sérialisation.
+AnyServerMessage = AiChunk | StateChange | ErrorMessage | ModelInfo
+ServerMessage = Annotated[AnyServerMessage, Field(discriminator="type")]
 
 client_message_adapter: TypeAdapter[ClientMessage] = TypeAdapter(ClientMessage)
 server_message_adapter: TypeAdapter[ServerMessage] = TypeAdapter(ServerMessage)

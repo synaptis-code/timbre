@@ -3,24 +3,26 @@
 import logging
 from collections.abc import Awaitable, Callable
 
-from timbre.protocol.messages import AiChunk, ErrorMessage, StateChange
+from timbre.core.conversation import Conversation
+from timbre.protocol.messages import AnyServerMessage, StateChange
 from timbre.protocol.states import AppState
 
 logger = logging.getLogger(__name__)
 
-SendFn = Callable[[AiChunk | StateChange | ErrorMessage], Awaitable[None]]
+SendFn = Callable[[AnyServerMessage], Awaitable[None]]
 
 
 class Session:
-    """Une conversation cliente : détient l'état courant et le canal de sortie.
+    """Une conversation cliente : état courant, historique et canal de sortie.
 
     Tout changement d'état passe par `set_state`, qui notifie systématiquement
     le client — le front n'a jamais à deviner l'état du backend.
     """
 
-    def __init__(self, send: SendFn) -> None:
+    def __init__(self, send: SendFn, conversation: Conversation) -> None:
         self._send = send
         self._state = AppState.IDLE
+        self.conversation = conversation
 
     @property
     def state(self) -> AppState:
@@ -33,5 +35,5 @@ class Session:
         self._state = state
         await self._send(StateChange(state=state))
 
-    async def send(self, message: AiChunk | StateChange | ErrorMessage) -> None:
+    async def send(self, message: AnyServerMessage) -> None:
         await self._send(message)

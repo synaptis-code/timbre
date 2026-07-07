@@ -8,6 +8,7 @@ import { TimbreSocket, type ConnectionStatus } from "./ws";
 export default function App() {
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [appState, setAppState] = useState<AppState>("idle");
+  const [modelName, setModelName] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const socketRef = useRef<TimbreSocket | null>(null);
   const nextId = useRef(0);
@@ -17,6 +18,9 @@ export default function App() {
       switch (message.type) {
         case "state_change":
           setAppState(message.state);
+          break;
+        case "model_info":
+          setModelName(message.model);
           break;
         case "ai_chunk":
           setMessages((prev) => {
@@ -60,6 +64,7 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <h1 className="app-title">Timbre</h1>
+        {modelName !== null && <span className="model-badge">{modelName}</span>}
         <span className={`connection connection--${status}`}>
           {status === "connected"
             ? "Connecté"

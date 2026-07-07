@@ -4,10 +4,12 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from timbre.config import Settings
+from timbre.core.conversation import Conversation
 from timbre.core.orchestrator import Orchestrator
 from timbre.core.session import Session
 from timbre.protocol.messages import (
-    AiChunk,
+    AnyServerMessage,
     ErrorMessage,
     ProtocolError,
     StateChange,
@@ -23,15 +25,18 @@ router = APIRouter()
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
     await websocket.accept()
+    orchestrator: Orchestrator = websocket.app.state.orchestrator
+    settings: Settings = websocket.app.state.settings
 
-    async def send(message: AiChunk | StateChange | ErrorMessage) -> None:
+    async def send(message: AnyServerMessage) -> None:
         await websocket.send_text(message.model_dump_json())
 
-    session = Session(send=send)
-    orchestrator = Orchestrator()
+    session = Session(send=send, conversation=Conversation(settings.system_prompt))
 
-    # État initial explicite : le front n'affiche jamais un état supposé.
+    # État initial explicite, puis modèle détecté (ou erreur guidante si LM Studio
+    # est éteint / vide) : le client sait immédiatement à quoi il parle.
     await session.send(StateChange(state=session.state))
+    await orchestrator.announce_model(session)
 
     try:
         while True:

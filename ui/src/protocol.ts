@@ -26,9 +26,13 @@ export interface ErrorMessage {
   code: string;
   message: string;
 }
-export type ServerMessage = AiChunk | StateChange | ErrorMessage;
+export interface ModelInfo {
+  type: "model_info";
+  model: string;
+}
+export type ServerMessage = AiChunk | StateChange | ErrorMessage | ModelInfo;
 
-const SERVER_MESSAGE_TYPES = new Set(["ai_chunk", "state_change", "error"]);
+const SERVER_MESSAGE_TYPES = new Set(["ai_chunk", "state_change", "error", "model_info"]);
 
 export function parseServerMessage(raw: string): ServerMessage | null {
   try {

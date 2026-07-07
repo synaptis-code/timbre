@@ -83,6 +83,26 @@
         "title": "ErrorMessage",
         "type": "object"
       },
+      "ModelInfo": {
+        "description": "Serveur → client : modèle LLM actif (détecté automatiquement dans LM Studio).",
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "type": {
+            "const": "model_info",
+            "default": "model_info",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "title": "ModelInfo",
+        "type": "object"
+      },
       "StateChange": {
         "description": "Serveur → client : nouvel état de l'assistant.",
         "properties": {
@@ -107,6 +127,7 @@
       "mapping": {
         "ai_chunk": "#/$defs/AiChunk",
         "error": "#/$defs/ErrorMessage",
+        "model_info": "#/$defs/ModelInfo",
         "state_change": "#/$defs/StateChange"
       },
       "propertyName": "type"
@@ -120,6 +141,9 @@
       },
       {
         "$ref": "#/$defs/ErrorMessage"
+      },
+      {
+        "$ref": "#/$defs/ModelInfo"
       }
     ]
   },
