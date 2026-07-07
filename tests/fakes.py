@@ -24,16 +24,20 @@ class FakeLLM(LLMBackend):
         self.fail_after = fail_after
         self.delay = delay
         self.received_messages: list[list[dict[str, object]]] = []
+        self.received_temperatures: list[float | None] = []
 
     async def active_model(self) -> str:
         if self.error is not None:
             raise self.error
         return self.model
 
-    async def stream_chat(self, messages: list[dict[str, object]]) -> AsyncIterator[str]:
+    async def stream_chat(
+        self, messages: list[dict[str, object]], temperature: float | None = None
+    ) -> AsyncIterator[str]:
         if self.error is not None:
             raise self.error
         self.received_messages.append(messages)
+        self.received_temperatures.append(temperature)
         for index, token in enumerate(self.tokens):
             if self.fail_after is not None and index >= self.fail_after:
                 raise LLMError("llm_unreachable", "connexion perdue (simulée)")
@@ -63,9 +67,13 @@ class FakeTTS(TTSBackend):
     def __init__(self, *, fail: bool = False) -> None:
         self.fail = fail
         self.spoken: list[str] = []
+        self.voices: list[tuple[str, float, int]] = []
 
-    async def synthesize(self, text: str, voice: str) -> AsyncIterator[bytes]:
+    async def synthesize(
+        self, text: str, voice: str, rate: float = 1.0, pitch: int = 0
+    ) -> AsyncIterator[bytes]:
         if self.fail:
             raise TTSError("tts_failed", "panne TTS simulée")
         self.spoken.append(text)
+        self.voices.append((voice, rate, pitch))
         yield f"AUDIO({text})".encode()

@@ -17,7 +17,14 @@ export interface UserAudio {
 export interface Interrupt {
   type: "interrupt";
 }
-export type ClientMessage = UserMessage | UserAudio | Interrupt;
+export interface SetPersona {
+  type: "set_persona";
+  persona_id: string;
+}
+export interface ListPersonas {
+  type: "list_personas";
+}
+export type ClientMessage = UserMessage | UserAudio | Interrupt | SetPersona | ListPersonas;
 
 // Serveur → client
 export interface AiChunk {
@@ -49,13 +56,25 @@ export interface UserTranscript {
   type: "user_transcript";
   text: string;
 }
+export interface PersonaSummary {
+  id: string;
+  name: string;
+  valid: boolean;
+  error: string | null;
+}
+export interface PersonaList {
+  type: "persona_list";
+  personas: PersonaSummary[];
+  active: string;
+}
 export type ServerMessage =
   | AiChunk
   | StateChange
   | ErrorMessage
   | ModelInfo
   | AiAudio
-  | UserTranscript;
+  | UserTranscript
+  | PersonaList;
 
 const SERVER_MESSAGE_TYPES = new Set([
   "ai_chunk",
@@ -64,6 +83,7 @@ const SERVER_MESSAGE_TYPES = new Set([
   "model_info",
   "ai_audio",
   "user_transcript",
+  "persona_list",
 ]);
 
 export function parseServerMessage(raw: string): ServerMessage | null {

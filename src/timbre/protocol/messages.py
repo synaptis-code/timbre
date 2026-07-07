@@ -40,7 +40,27 @@ class Interrupt(BaseModel):
     type: Literal["interrupt"] = "interrupt"
 
 
-ClientMessage = Annotated[UserMessage | UserAudio | Interrupt, Field(discriminator="type")]
+class SetPersona(BaseModel):
+    """Client → serveur : change de persona. Refusé avec raison si invalide (jamais en silence)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["set_persona"] = "set_persona"
+    persona_id: str = Field(min_length=1)
+
+
+class ListPersonas(BaseModel):
+    """Client → serveur : redemande la liste (re-scan du dossier → rechargement à chaud)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["list_personas"] = "list_personas"
+
+
+ClientMessage = Annotated[
+    UserMessage | UserAudio | Interrupt | SetPersona | ListPersonas,
+    Field(discriminator="type"),
+]
 
 
 class AiChunk(BaseModel):
@@ -97,8 +117,27 @@ class AiAudio(BaseModel):
     text: str
 
 
+class PersonaSummary(BaseModel):
+    """Un persona tel que vu par l'UI : valide (sélectionnable) ou invalide + raison."""
+
+    id: str
+    name: str
+    valid: bool
+    error: str | None = None
+
+
+class PersonaList(BaseModel):
+    """Serveur → client : personas disponibles (statuts inclus) et persona actif."""
+
+    type: Literal["persona_list"] = "persona_list"
+    personas: list[PersonaSummary]
+    active: str
+
+
 # Union nue pour typer les paramètres ; version annotée pour la (dé)sérialisation.
-AnyServerMessage = AiChunk | StateChange | ErrorMessage | ModelInfo | AiAudio | UserTranscript
+AnyServerMessage = (
+    AiChunk | StateChange | ErrorMessage | ModelInfo | AiAudio | UserTranscript | PersonaList
+)
 ServerMessage = Annotated[AnyServerMessage, Field(discriminator="type")]
 
 client_message_adapter: TypeAdapter[ClientMessage] = TypeAdapter(ClientMessage)

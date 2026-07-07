@@ -67,6 +67,42 @@ body {
   white-space: nowrap;
 }
 
+.persona {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-right: 0.75rem;
+}
+
+.persona-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.persona-dot--ok {
+  background: var(--ok);
+}
+
+.persona-dot--warn {
+  background: var(--error);
+}
+
+.persona-select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  font: inherit;
+  font-size: 0.85rem;
+  max-width: 10rem;
+}
+
+.persona-select:disabled {
+  opacity: 0.5;
+}
+
 .connection {
   font-size: 0.8rem;
   color: var(--text-dim);

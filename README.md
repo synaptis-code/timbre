@@ -55,6 +55,14 @@ Principes non négociables :
 - **Modularité** : changer de moteur TTS/ASR/LLM = un plugin derrière une interface, rien d'autre ne bouge.
 - **Local-first** : aucune donnée ne sort de la machine. ⚠️ Exception temporaire assumée : le moteur TTS par défaut du MVP (edge-tts) envoie le texte des réponses au service vocal de Microsoft. Désactivable (`TIMBRE_TTS_ENABLED=0`) ; les moteurs expressifs 100 % locaux le remplaceront (voir feuille de route). Voix configurable via `TIMBRE_TTS_VOICE`.
 
+### Personas
+
+Un persona = un fichier JSON dans [personas/](personas/) (personnalité, voix, accueil, température). Voir [personas/lea.json](personas/lea.json) pour le format. Règles :
+
+- **Validation stricte** au chargement (pydantic) : champ manquant, faute de frappe ou JSON cassé → le persona apparaît **invalide dans l'UI avec la raison exacte**, les autres ne sont pas affectés, et il n'y a **jamais de bascule silencieuse**.
+- **Rechargement à chaud** : éditer/ajouter un fichier suffit, le dossier est re-scanné à chaque interaction.
+- Changer de voix = changer `voice.voice_id` (et `params.rate`/`pitch` pour le débit et la hauteur). Persona par défaut : `TIMBRE_PERSONA`.
+
 Le protocole WebSocket (messages `user_message`, `ai_chunk`, `state_change`, `error`) est défini dans [src/timbre/protocol/messages.py](src/timbre/protocol/messages.py), reflété dans [ui/src/protocol.ts](ui/src/protocol.ts) et verrouillé par le snapshot [schemas/ws-protocol.schema.json](schemas/ws-protocol.schema.json).
 
 ## Feuille de route
@@ -66,7 +74,7 @@ Le protocole WebSocket (messages `user_message`, `ai_chunk`, `state_change`, `er
 | 3 | TTS : synthèse vocale streaming phrase par phrase (edge-tts) | ✅ |
 | 4 | ASR + VAD : micro mains-libres → Whisper GPU → boucle vocale complète | ✅ |
 | 5 | Interruption (Stop / nouvelle prise de parole), états fidèles, anti-larsen | ✅ |
-| 6 | Personas robustes (JSON validé, zéro fallback silencieux) | ⏳ |
+| 6 | Personas robustes (JSON validé, isolation, zéro fallback silencieux) | ✅ |
 | 7 | Polish UI | ⏳ |
 | 8 | Vision (partage d'écran par tour) | ⏳ |
 | 9 | Optimisation latence / VRAM | ⏳ |

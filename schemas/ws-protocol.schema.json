@@ -15,6 +15,42 @@
         "title": "Interrupt",
         "type": "object"
       },
+      "ListPersonas": {
+        "additionalProperties": false,
+        "description": "Client → serveur : redemande la liste (re-scan du dossier → rechargement à chaud).",
+        "properties": {
+          "type": {
+            "const": "list_personas",
+            "default": "list_personas",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "title": "ListPersonas",
+        "type": "object"
+      },
+      "SetPersona": {
+        "additionalProperties": false,
+        "description": "Client → serveur : change de persona. Refusé avec raison si invalide (jamais en silence).",
+        "properties": {
+          "persona_id": {
+            "minLength": 1,
+            "title": "Persona Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "set_persona",
+            "default": "set_persona",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "persona_id"
+        ],
+        "title": "SetPersona",
+        "type": "object"
+      },
       "UserAudio": {
         "additionalProperties": false,
         "description": "Client → serveur : une prise de parole détectée par le VAD (WAV 16 kHz mono).",
@@ -69,6 +105,8 @@
     "discriminator": {
       "mapping": {
         "interrupt": "#/$defs/Interrupt",
+        "list_personas": "#/$defs/ListPersonas",
+        "set_persona": "#/$defs/SetPersona",
         "user_audio": "#/$defs/UserAudio",
         "user_message": "#/$defs/UserMessage"
       },
@@ -83,6 +121,12 @@
       },
       {
         "$ref": "#/$defs/Interrupt"
+      },
+      {
+        "$ref": "#/$defs/SetPersona"
+      },
+      {
+        "$ref": "#/$defs/ListPersonas"
       }
     ]
   },
@@ -204,6 +248,70 @@
         "title": "ModelInfo",
         "type": "object"
       },
+      "PersonaList": {
+        "description": "Serveur → client : personas disponibles (statuts inclus) et persona actif.",
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "string"
+          },
+          "personas": {
+            "items": {
+              "$ref": "#/$defs/PersonaSummary"
+            },
+            "title": "Personas",
+            "type": "array"
+          },
+          "type": {
+            "const": "persona_list",
+            "default": "persona_list",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "personas",
+          "active"
+        ],
+        "title": "PersonaList",
+        "type": "object"
+      },
+      "PersonaSummary": {
+        "description": "Un persona tel que vu par l'UI : valide (sélectionnable) ou invalide + raison.",
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "valid"
+        ],
+        "title": "PersonaSummary",
+        "type": "object"
+      },
       "StateChange": {
         "description": "Serveur → client : nouvel état de l'assistant.",
         "properties": {
@@ -250,6 +358,7 @@
         "ai_chunk": "#/$defs/AiChunk",
         "error": "#/$defs/ErrorMessage",
         "model_info": "#/$defs/ModelInfo",
+        "persona_list": "#/$defs/PersonaList",
         "state_change": "#/$defs/StateChange",
         "user_transcript": "#/$defs/UserTranscript"
       },
@@ -273,6 +382,9 @@
       },
       {
         "$ref": "#/$defs/UserTranscript"
+      },
+      {
+        "$ref": "#/$defs/PersonaList"
       }
     ]
   },

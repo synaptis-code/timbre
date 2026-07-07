@@ -11,6 +11,10 @@ class Conversation:
         self._system_prompt = system_prompt
         self._turns: list[dict[str, object]] = []
 
+    def set_system_prompt(self, system_prompt: str) -> None:
+        """Changement de persona : effet immédiat, l'historique est conservé."""
+        self._system_prompt = system_prompt
+
     def add_user(self, text: str) -> None:
         self._turns.append({"role": "user", "content": text})
 

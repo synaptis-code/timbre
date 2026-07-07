@@ -17,8 +17,13 @@ logger = logging.getLogger(__name__)
 
 
 class EdgeTTSBackend(TTSBackend):
-    async def synthesize(self, text: str, voice: str) -> AsyncIterator[bytes]:
-        communicate = edge_tts.Communicate(text, voice)
+    async def synthesize(
+        self, text: str, voice: str, rate: float = 1.0, pitch: int = 0
+    ) -> AsyncIterator[bytes]:
+        rate_pct = round((rate - 1.0) * 100)
+        communicate = edge_tts.Communicate(
+            text, voice, rate=f"{rate_pct:+d}%", pitch=f"{pitch:+d}Hz"
+        )
         got_audio = False
         try:
             async for chunk in communicate.stream():

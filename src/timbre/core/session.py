@@ -4,6 +4,7 @@ import logging
 from collections.abc import Awaitable, Callable
 
 from timbre.core.conversation import Conversation
+from timbre.personas.models import Persona
 from timbre.protocol.messages import AnyServerMessage, StateChange
 from timbre.protocol.states import AppState
 
@@ -19,10 +20,11 @@ class Session:
     le client — le front n'a jamais à deviner l'état du backend.
     """
 
-    def __init__(self, send: SendFn, conversation: Conversation) -> None:
+    def __init__(self, send: SendFn, conversation: Conversation, persona: Persona) -> None:
         self._send = send
         self._state = AppState.IDLE
         self.conversation = conversation
+        self.persona = persona
 
     @property
     def state(self) -> AppState:

@@ -28,9 +28,10 @@ def test_health():
 
 def test_conversation_flow():
     with connect(FakeLLM(tokens=["Bon", "jour", " !"])) as ws:
-        # À la connexion : état initial + modèle détecté automatiquement.
+        # À la connexion : état initial + modèle détecté + liste des personas.
         assert ws.receive_json() == {"type": "state_change", "state": "idle"}
         assert ws.receive_json() == {"type": "model_info", "model": "fake-model"}
+        assert ws.receive_json()["type"] == "persona_list"
 
         ws.send_json({"type": "user_message", "text": "Salut !"})
 
@@ -47,7 +48,7 @@ def test_conversation_flow():
 def test_history_sent_to_llm_includes_system_prompt_and_turns():
     llm = FakeLLM(tokens=["Ça", " va"])
     with connect(llm) as ws:
-        ws.receive_json(), ws.receive_json()
+        ws.receive_json(), ws.receive_json(), ws.receive_json()
 
         ws.send_json({"type": "user_message", "text": "Comment ça va ?"})
         while ws.receive_json() != {"type": "state_change", "state": "idle"}:
@@ -71,6 +72,7 @@ def test_llm_unreachable_yields_explicit_error():
         first = ws.receive_json()
         assert first["type"] == "error"
         assert first["code"] == "llm_unreachable"
+        assert ws.receive_json()["type"] == "persona_list"
 
         ws.send_json({"type": "user_message", "text": "Allô ?"})
         assert ws.receive_json() == {"type": "state_change", "state": "thinking"}
@@ -81,7 +83,7 @@ def test_llm_unreachable_yields_explicit_error():
 def test_stream_failure_archives_partial_text():
     llm = FakeLLM(tokens=["Il", " était", " une fois"], fail_after=2)
     with connect(llm) as ws:
-        ws.receive_json(), ws.receive_json()
+        ws.receive_json(), ws.receive_json(), ws.receive_json()
 
         ws.send_json({"type": "user_message", "text": "Raconte une histoire"})
         received = []
@@ -103,7 +105,7 @@ def test_stream_failure_archives_partial_text():
 
 def test_invalid_message_yields_error_and_keeps_connection():
     with connect(FakeLLM()) as ws:
-        ws.receive_json(), ws.receive_json()
+        ws.receive_json(), ws.receive_json(), ws.receive_json()
 
         ws.send_text("n'importe quoi")
         error = ws.receive_json()

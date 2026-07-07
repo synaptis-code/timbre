@@ -33,8 +33,13 @@ class LLMBackend(ABC):
         """
 
     @abstractmethod
-    def stream_chat(self, messages: list[dict[str, object]]) -> AsyncIterator[str]:
-        """Émet la réponse token par token. Lève `LLMError` en cas de problème."""
+    def stream_chat(
+        self, messages: list[dict[str, object]], temperature: float | None = None
+    ) -> AsyncIterator[str]:
+        """Émet la réponse token par token. Lève `LLMError` en cas de problème.
+
+        `temperature=None` : valeur par défaut du backend (les personas la surchargent).
+        """
 
     async def aclose(self) -> None:  # noqa: B027 — no-op volontaire, surcharge optionnelle
         """Libère les ressources (connexions HTTP…). No-op par défaut."""
@@ -70,5 +75,10 @@ class TTSBackend(ABC):
     """Synthèse texte → audio, streaming phrase par phrase."""
 
     @abstractmethod
-    def synthesize(self, text: str, voice: str) -> AsyncIterator[bytes]:
-        """Émet l'audio (MP3) par blocs. Lève `TTSError` en cas de problème."""
+    def synthesize(
+        self, text: str, voice: str, rate: float = 1.0, pitch: int = 0
+    ) -> AsyncIterator[bytes]:
+        """Émet l'audio (MP3) par blocs. Lève `TTSError` en cas de problème.
+
+        `rate` : vitesse (1.0 = normale) ; `pitch` : décalage en Hz relatifs.
+        """

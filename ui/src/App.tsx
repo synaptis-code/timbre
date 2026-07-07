@@ -4,7 +4,8 @@ import { ActionBar } from "./components/ActionBar";
 import { ChatThread, type ChatMessage } from "./components/ChatThread";
 import { StateIndicator } from "./components/StateIndicator";
 import { MicController } from "./mic";
-import type { AppState, ServerMessage } from "./protocol";
+import { PersonaSelect } from "./components/PersonaSelect";
+import type { AppState, PersonaSummary, ServerMessage } from "./protocol";
 import { TimbreSocket, type ConnectionStatus } from "./ws";
 
 export default function App() {
@@ -13,6 +14,8 @@ export default function App() {
   const [modelName, setModelName] = useState<string | null>(null);
   const [micOn, setMicOn] = useState(false);
   const [ttsPlaying, setTtsPlaying] = useState(false);
+  const [personas, setPersonas] = useState<PersonaSummary[]>([]);
+  const [activePersona, setActivePersona] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const socketRef = useRef<TimbreSocket | null>(null);
   const micRef = useRef<MicController | null>(null);
@@ -48,6 +51,10 @@ export default function App() {
           break;
         case "model_info":
           setModelName(message.model);
+          break;
+        case "persona_list":
+          setPersonas(message.personas);
+          setActivePersona(message.active);
           break;
         case "user_transcript":
           append({ role: "user", text: message.text });
@@ -115,6 +122,13 @@ export default function App() {
       <header className="app-header">
         <h1 className="app-title">Timbre</h1>
         {modelName !== null && <span className="model-badge">{modelName}</span>}
+        <PersonaSelect
+          personas={personas}
+          active={activePersona}
+          disabled={status !== "connected"}
+          onSelect={(id) => socketRef.current?.send({ type: "set_persona", persona_id: id })}
+          onRefresh={() => socketRef.current?.send({ type: "list_personas" })}
+        />
         <span className={`connection connection--${status}`}>
           {status === "connected"
             ? "Connecté"

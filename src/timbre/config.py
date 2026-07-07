@@ -25,7 +25,12 @@ class Settings(BaseSettings):
     tts_enabled: bool = True
     tts_voice: str = "fr-FR-VivienneMultilingualNeural"
 
-    # Prompt système par défaut — remplacé par les personas en Phase 6.
+    # Personas (dossier de fichiers JSON validés — voir personas/)
+    personas_dir: str = "personas"
+    persona: str = "lea"  # persona actif à la connexion
+
+    # Prompt système de secours, utilisé si le persona par défaut est invalide
+    # (avec une erreur explicite — jamais de bascule silencieuse).
     system_prompt: str = (
         "Tu es un assistant vocal français, chaleureux et concis. "
         "Tu réponds en phrases courtes et naturelles, comme à l'oral, sans listes ni Markdown."

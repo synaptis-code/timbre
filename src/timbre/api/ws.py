@@ -21,7 +21,9 @@ from timbre.protocol.messages import (
     AnyServerMessage,
     ErrorMessage,
     Interrupt,
+    ListPersonas,
     ProtocolError,
+    SetPersona,
     StateChange,
     UserAudio,
     UserMessage,
@@ -48,7 +50,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         async with send_lock:
             await websocket.send_text(message.model_dump_json())
 
-    session = Session(send=send, conversation=Conversation(settings.system_prompt))
+    session = Session(
+        send=send,
+        conversation=Conversation(settings.system_prompt),
+        persona=orchestrator.fallback_persona,
+    )
     turn_task: asyncio.Task[None] | None = None
 
     async def cancel_current_turn() -> None:
@@ -61,12 +67,14 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             await session.set_state(AppState.IDLE)
         turn_task = None
 
-    async def run_turn(message: UserMessage | UserAudio) -> None:
+    async def run_turn(message: UserMessage | UserAudio | SetPersona) -> None:
         try:
             if isinstance(message, UserMessage):
                 await orchestrator.handle_user_message(session, message)
-            else:
+            elif isinstance(message, UserAudio):
                 await orchestrator.handle_user_audio(session, message)
+            else:
+                await orchestrator.handle_set_persona(session, message)
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -80,9 +88,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             await session.set_state(AppState.IDLE)
 
     # État initial explicite, puis modèle détecté (ou erreur guidante si LM Studio
-    # est éteint / vide) : le client sait immédiatement à quoi il parle.
+    # est éteint / vide), puis persona par défaut et liste des personas : le
+    # client sait immédiatement à quoi il parle.
     await session.send(StateChange(state=session.state))
     await orchestrator.announce_model(session)
+    await orchestrator.init_persona(session)
 
     try:
         while True:
@@ -95,6 +105,9 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 continue
             if isinstance(message, Interrupt):
                 await cancel_current_turn()
+                continue
+            if isinstance(message, ListPersonas):
+                await orchestrator.send_persona_list(session)
                 continue
             # Une nouvelle entrée remplace le tour en cours (le texte partiel
             # est archivé tel quel par l'orchestrateur).

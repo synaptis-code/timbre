@@ -19,7 +19,7 @@ def run_audio_turn(asr: FakeASR, llm: FakeLLM | None = None) -> list[dict]:
         create_app(llm=llm or FakeLLM(tokens=["Salut", " !"]), tts=FakeTTS(), asr=asr)
     )
     with client.websocket_connect("/ws") as ws:
-        ws.receive_json(), ws.receive_json()
+        ws.receive_json(), ws.receive_json(), ws.receive_json()
         ws.send_json({"type": "user_audio", "audio_b64": FAKE_WAV, "format": "wav"})
         received = []
         while (msg := ws.receive_json()) != {"type": "state_change", "state": "idle"}:
@@ -66,7 +66,7 @@ def test_empty_transcript_is_reported():
 def test_invalid_base64_is_reported():
     client = TestClient(create_app(llm=FakeLLM(), tts=FakeTTS(), asr=FakeASR()))
     with client.websocket_connect("/ws") as ws:
-        ws.receive_json(), ws.receive_json()
+        ws.receive_json(), ws.receive_json(), ws.receive_json()
         ws.send_json({"type": "user_audio", "audio_b64": "pas du base64 !!!", "format": "wav"})
         messages = [ws.receive_json() for _ in range(3)]
         assert any(m.get("code") == "invalid_audio" for m in messages)
@@ -79,6 +79,6 @@ def test_asr_disabled_is_explicit():
         create_app(llm=FakeLLM(), tts=FakeTTS(), settings=Settings(asr_enabled=False))
     )
     with client.websocket_connect("/ws") as ws:
-        ws.receive_json(), ws.receive_json()
+        ws.receive_json(), ws.receive_json(), ws.receive_json()
         ws.send_json({"type": "user_audio", "audio_b64": FAKE_WAV, "format": "wav"})
         assert ws.receive_json()["code"] == "asr_unavailable"

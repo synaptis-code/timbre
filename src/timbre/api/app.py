@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 
@@ -9,6 +10,8 @@ from timbre import __version__
 from timbre.api.ws import router as ws_router
 from timbre.config import Settings
 from timbre.core.orchestrator import Orchestrator
+from timbre.personas.models import Persona, VoiceConfig
+from timbre.personas.store import PersonaStore
 from timbre.plugins.asr.whisper import FasterWhisperASR
 from timbre.plugins.base import ASRBackend, LLMBackend, TTSBackend
 from timbre.plugins.llm.lmstudio import LMStudioBackend
@@ -24,6 +27,7 @@ def create_app(
     """`llm`, `tts`, `asr` et `settings` sont injectables pour les tests.
 
     Par défaut : LM Studio (modèle chargé auto-détecté) + edge-tts + faster-whisper.
+    `tts` injecté est enregistré sous le nom de moteur « edge-tts ».
     """
     app_settings = settings if settings is not None else Settings()
     llm_backend = (
@@ -38,6 +42,7 @@ def create_app(
     tts_backend = (
         tts if tts is not None else (EdgeTTSBackend() if app_settings.tts_enabled else None)
     )
+    tts_engines: dict[str, TTSBackend] = {"edge-tts": tts_backend} if tts_backend else {}
     asr_backend = (
         asr
         if asr is not None
@@ -52,6 +57,17 @@ def create_app(
         )
     )
 
+    persona_store = PersonaStore(
+        Path(app_settings.personas_dir),
+        known_engines=set(tts_engines) if tts_engines else None,
+    )
+    fallback_persona = Persona(
+        id="defaut",
+        name="Défaut",
+        system_prompt=app_settings.system_prompt,
+        voice=VoiceConfig(voice_id=app_settings.tts_voice),
+    )
+
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         yield
@@ -60,7 +76,12 @@ def create_app(
     app = FastAPI(title="Timbre", version=__version__, lifespan=lifespan)
     app.state.settings = app_settings
     app.state.orchestrator = Orchestrator(
-        llm=llm_backend, tts=tts_backend, tts_voice=app_settings.tts_voice, asr=asr_backend
+        llm=llm_backend,
+        tts_engines=tts_engines,
+        asr=asr_backend,
+        persona_store=persona_store,
+        default_persona_id=app_settings.persona,
+        fallback_persona=fallback_persona,
     )
     app.include_router(ws_router)
 

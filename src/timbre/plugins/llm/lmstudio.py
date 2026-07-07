@@ -77,12 +77,14 @@ class LMStudioBackend(LLMBackend):
             )
         return str(entries[0]["id"])
 
-    async def stream_chat(self, messages: list[dict[str, object]]) -> AsyncIterator[str]:
+    async def stream_chat(
+        self, messages: list[dict[str, object]], temperature: float | None = None
+    ) -> AsyncIterator[str]:
         model = await self.active_model()
         payload = {
             "model": model,
             "messages": messages,
-            "temperature": self._temperature,
+            "temperature": temperature if temperature is not None else self._temperature,
             "stream": True,
         }
         try:

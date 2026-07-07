@@ -1,8 +1,9 @@
 """Boucle de conversation.
 
-Phase 3 : texte → LLM (streaming) → découpage en phrases → TTS phrase par
+Texte ou voix → LLM (streaming) → découpage en phrases → TTS phrase par
 phrase, EN PARALLÈLE de la génération (latence perçue minimale, §14 du plan).
-L'ASR/VAD (Phase 4) se branchera en amont.
+Le persona actif de la session pilote le prompt système, la voix (moteur,
+voix, débit, hauteur) et la température.
 """
 
 import asyncio
@@ -14,12 +15,17 @@ from base64 import b64decode, b64encode
 from timbre.core.segmenter import SentenceSplitter
 from timbre.core.session import Session
 from timbre.core.tts_text import clean_for_tts, is_speakable
+from timbre.personas.models import Persona
+from timbre.personas.store import PersonaError, PersonaStore
 from timbre.plugins.base import ASRBackend, ASRError, LLMBackend, LLMError, TTSBackend, TTSError
 from timbre.protocol.messages import (
     AiAudio,
     AiChunk,
     ErrorMessage,
     ModelInfo,
+    PersonaList,
+    PersonaSummary,
+    SetPersona,
     UserAudio,
     UserMessage,
     UserTranscript,
@@ -33,14 +39,76 @@ class Orchestrator:
     def __init__(
         self,
         llm: LLMBackend,
-        tts: TTSBackend | None = None,
-        tts_voice: str = "",
-        asr: ASRBackend | None = None,
+        tts_engines: dict[str, TTSBackend],
+        asr: ASRBackend | None,
+        persona_store: PersonaStore,
+        default_persona_id: str,
+        fallback_persona: Persona,
     ) -> None:
         self._llm = llm
-        self._tts = tts
-        self._tts_voice = tts_voice
+        self._tts_engines = tts_engines
         self._asr = asr
+        self._store = persona_store
+        self._default_persona_id = default_persona_id
+        self.fallback_persona = fallback_persona
+
+    # ── Personas ────────────────────────────────────────────────────────────
+
+    async def init_persona(self, session: Session) -> None:
+        """Applique le persona par défaut à la connexion.
+
+        S'il est invalide : erreur EXPLICITE + persona de secours annoncé —
+        jamais de bascule silencieuse (bug n°2).
+        """
+        try:
+            persona = self._store.get(self._default_persona_id)
+        except PersonaError as exc:
+            await session.send(
+                ErrorMessage(
+                    code=exc.code,
+                    message=f"{exc.message} Persona de secours « Défaut » utilisé.",
+                )
+            )
+            persona = self.fallback_persona
+        self._apply_persona(session, persona)
+        await self.send_persona_list(session)
+
+    async def handle_set_persona(self, session: Session, message: SetPersona) -> None:
+        try:
+            persona = self._store.get(message.persona_id)
+        except PersonaError as exc:
+            # Persona courant conservé, raison affichée — pas de bascule silencieuse.
+            await session.send(ErrorMessage(code=exc.code, message=exc.message))
+            return
+        self._apply_persona(session, persona)
+        await self.send_persona_list(session)
+        if persona.greeting:
+            session.conversation.add_assistant(persona.greeting)
+            await session.send(AiChunk(text=persona.greeting, last=True))
+            await self._speak_one(session, persona.greeting)
+
+    async def send_persona_list(self, session: Session) -> None:
+        """Re-scan du dossier à chaque appel : rechargement à chaud."""
+        summaries = [
+            PersonaSummary(
+                id=status.id,
+                name=status.persona.name if status.persona else status.id,
+                valid=status.persona is not None,
+                error=status.error,
+            )
+            for status in self._store.scan()
+        ]
+        await session.send(PersonaList(personas=summaries, active=session.persona.id))
+
+    def _apply_persona(self, session: Session, persona: Persona) -> None:
+        session.persona = persona
+        session.conversation.set_system_prompt(persona.system_prompt)
+        logger.info("persona actif : %s (%s)", persona.id, persona.voice.voice_id)
+
+    def _engine_for(self, session: Session) -> TTSBackend | None:
+        return self._tts_engines.get(session.persona.voice.engine)
+
+    # ── Modèle ──────────────────────────────────────────────────────────────
 
     async def announce_model(self, session: Session) -> None:
         """Détecte le modèle actif et l'annonce au client ; erreur explicite sinon."""
@@ -48,6 +116,8 @@ class Orchestrator:
             await session.send(ModelInfo(model=await self._llm.active_model()))
         except LLMError as exc:
             await session.send(ErrorMessage(code=exc.code, message=exc.message))
+
+    # ── Tours de conversation ───────────────────────────────────────────────
 
     async def handle_user_message(self, session: Session, message: UserMessage) -> None:
         await self._generate_reply(session, message.text)
@@ -107,14 +177,17 @@ class Orchestrator:
         splitter = SentenceSplitter()
         sentences: asyncio.Queue[str | None] = asyncio.Queue()
         speaker: asyncio.Task[None] | None = None
-        if self._tts is not None:
+        if self._engine_for(session) is not None:
             speaker = asyncio.create_task(self._speak_sentences(session, sentences))
 
         emitted: list[str] = []
         interrupted = False
         try:
             try:
-                async for token in self._llm.stream_chat(conversation.to_messages()):
+                stream = self._llm.stream_chat(
+                    conversation.to_messages(), temperature=session.persona.temperature
+                )
+                async for token in stream:
                     emitted.append(token)
                     await session.send(AiChunk(text=token))
                     for sentence in splitter.feed(token):
@@ -154,6 +227,8 @@ class Orchestrator:
             conversation.add_assistant("".join(emitted))
             await session.set_state(AppState.IDLE)
 
+    # ── Voix ────────────────────────────────────────────────────────────────
+
     async def _speak_sentences(
         self, session: Session, sentences: asyncio.Queue[str | None]
     ) -> None:
@@ -162,32 +237,56 @@ class Orchestrator:
         Une panne TTS est signalée UNE fois puis la voix est coupée pour le tour ;
         le texte, lui, continue d'arriver — jamais de tour perdu pour un souci audio.
         """
-        assert self._tts is not None
         failed = False
         while (sentence := await sentences.get()) is not None:
-            text = clean_for_tts(sentence)
-            if failed or not is_speakable(text):
+            if failed:
                 continue
-            try:
-                audio = b"".join(
-                    [chunk async for chunk in self._tts.synthesize(text, self._tts_voice)]
-                )
-            except TTSError as exc:
+            audio = await self._synthesize(session, sentence)
+            if audio is None:
                 failed = True
-                logger.warning("TTS en panne pour ce tour (%s) : %s", exc.code, exc.message)
-                await session.send(ErrorMessage(code=exc.code, message=exc.message))
-                continue
-            except Exception:
-                failed = True
-                logger.exception("erreur TTS inattendue")
+            elif audio:
+                await session.set_state(AppState.SPEAKING)
                 await session.send(
-                    ErrorMessage(
-                        code="tts_failed",
-                        message="Erreur TTS inattendue — voir les logs serveur.",
+                    AiAudio(
+                        audio_b64=b64encode(audio).decode("ascii"),
+                        text=clean_for_tts(sentence),
                     )
                 )
-                continue
-            if not audio:
-                continue
-            await session.set_state(AppState.SPEAKING)
-            await session.send(AiAudio(audio_b64=b64encode(audio).decode("ascii"), text=text))
+
+    async def _speak_one(self, session: Session, text: str) -> None:
+        """Synthèse ponctuelle (message d'accueil d'un persona)."""
+        audio = await self._synthesize(session, text)
+        if audio:
+            await session.send(
+                AiAudio(audio_b64=b64encode(audio).decode("ascii"), text=clean_for_tts(text))
+            )
+
+    async def _synthesize(self, session: Session, sentence: str) -> bytes | None:
+        """Renvoie l'audio d'une phrase, b"" si rien à dire, None si panne (signalée)."""
+        engine = self._engine_for(session)
+        text = clean_for_tts(sentence)
+        if engine is None or not is_speakable(text):
+            return b""
+        voice = session.persona.voice
+        try:
+            return b"".join(
+                [
+                    chunk
+                    async for chunk in engine.synthesize(
+                        text, voice.voice_id, rate=voice.params.rate, pitch=voice.params.pitch
+                    )
+                ]
+            )
+        except TTSError as exc:
+            logger.warning("TTS en panne pour ce tour (%s) : %s", exc.code, exc.message)
+            await session.send(ErrorMessage(code=exc.code, message=exc.message))
+            return None
+        except Exception:
+            logger.exception("erreur TTS inattendue")
+            await session.send(
+                ErrorMessage(
+                    code="tts_failed",
+                    message="Erreur TTS inattendue — voir les logs serveur.",
+                )
+            )
+            return None
