@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     # None = auto-détection du modèle chargé dans LM Studio (recommandé).
     llm_model: str | None = None
     llm_temperature: float = 0.8
+    # TTS (edge-tts par défaut ; deviendra un choix de plugin avec les personas)
+    tts_enabled: bool = True
+    tts_voice: str = "fr-FR-VivienneMultilingualNeural"
+
     # Prompt système par défaut — remplacé par les personas en Phase 6.
     system_prompt: str = (
         "Tu es un assistant vocal français, chaleureux et concis. "

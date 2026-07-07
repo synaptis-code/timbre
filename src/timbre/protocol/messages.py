@@ -57,8 +57,20 @@ class ModelInfo(BaseModel):
     model: str
 
 
+class AiAudio(BaseModel):
+    """Serveur → client : audio d'une phrase de la réponse, à jouer dans l'ordre reçu.
+
+    `text` est la phrase nettoyée réellement synthétisée (debug/sous-titres).
+    """
+
+    type: Literal["ai_audio"] = "ai_audio"
+    audio_b64: str
+    format: Literal["mp3"] = "mp3"
+    text: str
+
+
 # Union nue pour typer les paramètres ; version annotée pour la (dé)sérialisation.
-AnyServerMessage = AiChunk | StateChange | ErrorMessage | ModelInfo
+AnyServerMessage = AiChunk | StateChange | ErrorMessage | ModelInfo | AiAudio
 ServerMessage = Annotated[AnyServerMessage, Field(discriminator="type")]
 
 client_message_adapter: TypeAdapter[ClientMessage] = TypeAdapter(ClientMessage)

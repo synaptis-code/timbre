@@ -2,7 +2,7 @@
 
 from collections.abc import AsyncIterator
 
-from timbre.plugins.base import LLMBackend, LLMError
+from timbre.plugins.base import LLMBackend, LLMError, TTSBackend, TTSError
 
 
 class FakeLLM(LLMBackend):
@@ -35,3 +35,17 @@ class FakeLLM(LLMBackend):
             if self.fail_after is not None and index >= self.fail_after:
                 raise LLMError("llm_unreachable", "connexion perdue (simulée)")
             yield token
+
+
+class FakeTTS(TTSBackend):
+    """TTS factice : renvoie `AUDIO(<texte>)` en guise d'audio et note ce qu'il dit."""
+
+    def __init__(self, *, fail: bool = False) -> None:
+        self.fail = fail
+        self.spoken: list[str] = []
+
+    async def synthesize(self, text: str, voice: str) -> AsyncIterator[bytes]:
+        if self.fail:
+            raise TTSError("tts_failed", "panne TTS simulée")
+        self.spoken.append(text)
+        yield f"AUDIO({text})".encode()

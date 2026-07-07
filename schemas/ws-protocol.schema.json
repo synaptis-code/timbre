@@ -23,6 +23,37 @@
   },
   "server": {
     "$defs": {
+      "AiAudio": {
+        "description": "Serveur → client : audio d'une phrase de la réponse, à jouer dans l'ordre reçu.\n\n`text` est la phrase nettoyée réellement synthétisée (debug/sous-titres).",
+        "properties": {
+          "audio_b64": {
+            "title": "Audio B64",
+            "type": "string"
+          },
+          "format": {
+            "const": "mp3",
+            "default": "mp3",
+            "title": "Format",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "const": "ai_audio",
+            "default": "ai_audio",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "audio_b64",
+          "text"
+        ],
+        "title": "AiAudio",
+        "type": "object"
+      },
       "AiChunk": {
         "description": "Serveur → client : fragment de réponse en streaming. `last=True` clôt le tour.",
         "properties": {
@@ -125,6 +156,7 @@
     },
     "discriminator": {
       "mapping": {
+        "ai_audio": "#/$defs/AiAudio",
         "ai_chunk": "#/$defs/AiChunk",
         "error": "#/$defs/ErrorMessage",
         "model_info": "#/$defs/ModelInfo",
@@ -144,6 +176,9 @@
       },
       {
         "$ref": "#/$defs/ModelInfo"
+      },
+      {
+        "$ref": "#/$defs/AiAudio"
       }
     ]
   },

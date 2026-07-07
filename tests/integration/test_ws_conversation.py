@@ -9,11 +9,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from fakes import FakeLLM
 from timbre.api.app import create_app
+from timbre.config import Settings
 from timbre.plugins.base import LLMError
 
 
 def connect(llm: FakeLLM):
-    return TestClient(create_app(llm=llm)).websocket_connect("/ws")
+    # TTS coupé ici : ces tests couvrent le flux texte (l'audio a les siens).
+    settings = Settings(tts_enabled=False)
+    return TestClient(create_app(llm=llm, settings=settings)).websocket_connect("/ws")
 
 
 def test_health():

@@ -51,7 +51,7 @@ Principes non négociables :
 
 - **Zéro plantage silencieux** : toute erreur devient un message `error` visible côté client.
 - **Modularité** : changer de moteur TTS/ASR/LLM = un plugin derrière une interface, rien d'autre ne bouge.
-- **Local-first** : aucune donnée ne sort de la machine.
+- **Local-first** : aucune donnée ne sort de la machine. ⚠️ Exception temporaire assumée : le moteur TTS par défaut du MVP (edge-tts) envoie le texte des réponses au service vocal de Microsoft. Désactivable (`TIMBRE_TTS_ENABLED=0`) ; les moteurs expressifs 100 % locaux le remplaceront (voir feuille de route). Voix configurable via `TIMBRE_TTS_VOICE`.
 
 Le protocole WebSocket (messages `user_message`, `ai_chunk`, `state_change`, `error`) est défini dans [src/timbre/protocol/messages.py](src/timbre/protocol/messages.py), reflété dans [ui/src/protocol.ts](ui/src/protocol.ts) et verrouillé par le snapshot [schemas/ws-protocol.schema.json](schemas/ws-protocol.schema.json).
 
@@ -61,7 +61,7 @@ Le protocole WebSocket (messages `user_message`, `ai_chunk`, `state_change`, `er
 |---|---|---|
 | 1 | Squelette : WebSocket typé, UI d'état, test d'intégration | ✅ |
 | 2 | LLM : streaming LM Studio, modèle chargé auto-détecté | ✅ |
-| 3 | TTS : synthèse vocale streaming phrase par phrase | ⏳ |
+| 3 | TTS : synthèse vocale streaming phrase par phrase (edge-tts) | ✅ |
 | 4 | ASR + VAD : boucle vocale complète | ⏳ |
 | 5 | Anti-feedback + états mains-libres | ⏳ |
 | 6 | Personas robustes (JSON validé, zéro fallback silencieux) | ⏳ |

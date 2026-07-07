@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { AudioQueue } from "./audio";
 import { ActionBar } from "./components/ActionBar";
 import { ChatThread, type ChatMessage } from "./components/ChatThread";
 import { StateIndicator } from "./components/StateIndicator";
@@ -14,6 +15,7 @@ export default function App() {
   const nextId = useRef(0);
 
   useEffect(() => {
+    const audioQueue = new AudioQueue();
     const handleMessage = (message: ServerMessage) => {
       switch (message.type) {
         case "state_change":
@@ -21,6 +23,9 @@ export default function App() {
           break;
         case "model_info":
           setModelName(message.model);
+          break;
+        case "ai_audio":
+          audioQueue.enqueue(message.audio_b64);
           break;
         case "ai_chunk":
           setMessages((prev) => {
@@ -50,7 +55,10 @@ export default function App() {
 
     const socket = new TimbreSocket({ onMessage: handleMessage, onStatus: setStatus });
     socketRef.current = socket;
-    return () => socket.dispose();
+    return () => {
+      socket.dispose();
+      audioQueue.stop();
+    };
   }, []);
 
   const sendUserMessage = (text: string) => {

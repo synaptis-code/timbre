@@ -47,9 +47,18 @@ class ASRBackend(ABC):
     async def transcribe(self, audio: bytes) -> str: ...
 
 
+class TTSError(Exception):
+    """Erreur TTS destinée à l'utilisateur : code stable + message clair."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
 class TTSBackend(ABC):
     """Synthèse texte → audio, streaming phrase par phrase."""
 
     @abstractmethod
     def synthesize(self, text: str, voice: str) -> AsyncIterator[bytes]:
-        """Émet l'audio par blocs prêts à jouer."""
+        """Émet l'audio (MP3) par blocs. Lève `TTSError` en cas de problème."""

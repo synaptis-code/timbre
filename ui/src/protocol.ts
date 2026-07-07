@@ -30,9 +30,21 @@ export interface ModelInfo {
   type: "model_info";
   model: string;
 }
-export type ServerMessage = AiChunk | StateChange | ErrorMessage | ModelInfo;
+export interface AiAudio {
+  type: "ai_audio";
+  audio_b64: string;
+  format: "mp3";
+  text: string;
+}
+export type ServerMessage = AiChunk | StateChange | ErrorMessage | ModelInfo | AiAudio;
 
-const SERVER_MESSAGE_TYPES = new Set(["ai_chunk", "state_change", "error", "model_info"]);
+const SERVER_MESSAGE_TYPES = new Set([
+  "ai_chunk",
+  "state_change",
+  "error",
+  "model_info",
+  "ai_audio",
+]);
 
 export function parseServerMessage(raw: string): ServerMessage | null {
   try {
