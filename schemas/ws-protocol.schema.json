@@ -1,25 +1,72 @@
 {
   "client": {
-    "additionalProperties": false,
-    "description": "Client → serveur : texte saisi (ou transcrit, à partir de la Phase 4).",
-    "properties": {
-      "text": {
-        "minLength": 1,
-        "title": "Text",
-        "type": "string"
+    "$defs": {
+      "UserAudio": {
+        "additionalProperties": false,
+        "description": "Client → serveur : une prise de parole détectée par le VAD (WAV 16 kHz mono).",
+        "properties": {
+          "audio_b64": {
+            "minLength": 1,
+            "title": "Audio B64",
+            "type": "string"
+          },
+          "format": {
+            "const": "wav",
+            "default": "wav",
+            "title": "Format",
+            "type": "string"
+          },
+          "type": {
+            "const": "user_audio",
+            "default": "user_audio",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "audio_b64"
+        ],
+        "title": "UserAudio",
+        "type": "object"
       },
-      "type": {
-        "const": "user_message",
-        "default": "user_message",
-        "title": "Type",
-        "type": "string"
+      "UserMessage": {
+        "additionalProperties": false,
+        "description": "Client → serveur : texte saisi au clavier.",
+        "properties": {
+          "text": {
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "const": "user_message",
+            "default": "user_message",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "UserMessage",
+        "type": "object"
       }
     },
-    "required": [
-      "text"
-    ],
-    "title": "UserMessage",
-    "type": "object"
+    "discriminator": {
+      "mapping": {
+        "user_audio": "#/$defs/UserAudio",
+        "user_message": "#/$defs/UserMessage"
+      },
+      "propertyName": "type"
+    },
+    "oneOf": [
+      {
+        "$ref": "#/$defs/UserMessage"
+      },
+      {
+        "$ref": "#/$defs/UserAudio"
+      }
+    ]
   },
   "server": {
     "$defs": {
@@ -152,6 +199,26 @@
         ],
         "title": "StateChange",
         "type": "object"
+      },
+      "UserTranscript": {
+        "description": "Serveur → client : ce que l'ASR a compris (affiché comme bulle utilisateur).",
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "const": "user_transcript",
+            "default": "user_transcript",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "UserTranscript",
+        "type": "object"
       }
     },
     "discriminator": {
@@ -160,7 +227,8 @@
         "ai_chunk": "#/$defs/AiChunk",
         "error": "#/$defs/ErrorMessage",
         "model_info": "#/$defs/ModelInfo",
-        "state_change": "#/$defs/StateChange"
+        "state_change": "#/$defs/StateChange",
+        "user_transcript": "#/$defs/UserTranscript"
       },
       "propertyName": "type"
     },
@@ -179,6 +247,9 @@
       },
       {
         "$ref": "#/$defs/AiAudio"
+      },
+      {
+        "$ref": "#/$defs/UserTranscript"
       }
     ]
   },

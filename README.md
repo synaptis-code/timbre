@@ -14,15 +14,17 @@ Assistant vocal IA **100 % local** et open source : vous parlez, l'IA comprend, 
 ## Démarrage
 
 ```powershell
-# Backend (terminal 1)
-uv sync
-uv run timbre          # démarre sur http://127.0.0.1:8765
+# Backend (terminal 1) — l'extra « asr » installe faster-whisper + les DLL CUDA
+uv sync --extra asr
+uv run --extra asr timbre   # démarre sur http://127.0.0.1:8765
 
 # UI (terminal 2)
 cd ui
 npm install
-npm run dev            # ouvre http://localhost:5173
+npm run dev                 # ouvre http://localhost:5173
 ```
+
+Clique **Micro ○** dans l'UI et autorise le micro : le mode mains-libres est continu — parle, Timbre transcrit (Whisper sur GPU), répond et parle. Le micro est automatiquement mis en pause pendant que l'IA parle (anti-larsen). Sans GPU NVIDIA : `TIMBRE_ASR_DEVICE=cpu`.
 
 Sous Windows, forcer l'UTF-8 évite tout souci d'accents dans la console : `$env:PYTHONUTF8 = "1"`.
 
@@ -62,7 +64,7 @@ Le protocole WebSocket (messages `user_message`, `ai_chunk`, `state_change`, `er
 | 1 | Squelette : WebSocket typé, UI d'état, test d'intégration | ✅ |
 | 2 | LLM : streaming LM Studio, modèle chargé auto-détecté | ✅ |
 | 3 | TTS : synthèse vocale streaming phrase par phrase (edge-tts) | ✅ |
-| 4 | ASR + VAD : boucle vocale complète | ⏳ |
+| 4 | ASR + VAD : micro mains-libres → Whisper GPU → boucle vocale complète | ✅ |
 | 5 | Anti-feedback + états mains-libres | ⏳ |
 | 6 | Personas robustes (JSON validé, zéro fallback silencieux) | ⏳ |
 | 7 | Polish UI | ⏳ |

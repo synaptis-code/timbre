@@ -6,14 +6,23 @@ L'ASR/VAD (Phase 4) se branchera en amont.
 """
 
 import asyncio
+import binascii
 import logging
-from base64 import b64encode
+from base64 import b64decode, b64encode
 
 from timbre.core.segmenter import SentenceSplitter
 from timbre.core.session import Session
 from timbre.core.tts_text import clean_for_tts, is_speakable
-from timbre.plugins.base import LLMBackend, LLMError, TTSBackend, TTSError
-from timbre.protocol.messages import AiAudio, AiChunk, ErrorMessage, ModelInfo, UserMessage
+from timbre.plugins.base import ASRBackend, ASRError, LLMBackend, LLMError, TTSBackend, TTSError
+from timbre.protocol.messages import (
+    AiAudio,
+    AiChunk,
+    ErrorMessage,
+    ModelInfo,
+    UserAudio,
+    UserMessage,
+    UserTranscript,
+)
 from timbre.protocol.states import AppState
 
 logger = logging.getLogger(__name__)
@@ -25,10 +34,12 @@ class Orchestrator:
         llm: LLMBackend,
         tts: TTSBackend | None = None,
         tts_voice: str = "",
+        asr: ASRBackend | None = None,
     ) -> None:
         self._llm = llm
         self._tts = tts
         self._tts_voice = tts_voice
+        self._asr = asr
 
     async def announce_model(self, session: Session) -> None:
         """Détecte le modèle actif et l'annonce au client ; erreur explicite sinon."""
@@ -38,8 +49,48 @@ class Orchestrator:
             await session.send(ErrorMessage(code=exc.code, message=exc.message))
 
     async def handle_user_message(self, session: Session, message: UserMessage) -> None:
+        await self._generate_reply(session, message.text)
+
+    async def handle_user_audio(self, session: Session, message: UserAudio) -> None:
+        """Une prise de parole : transcription puis tour de conversation normal."""
+        if self._asr is None:
+            await session.send(
+                ErrorMessage(
+                    code="asr_unavailable",
+                    message="La transcription vocale est désactivée (TIMBRE_ASR_ENABLED=0).",
+                )
+            )
+            return
+        await session.set_state(AppState.THINKING)
+        try:
+            audio = b64decode(message.audio_b64, validate=True)
+        except binascii.Error:
+            await session.send(
+                ErrorMessage(code="invalid_audio", message="Audio illisible (base64 invalide).")
+            )
+            await session.set_state(AppState.IDLE)
+            return
+        try:
+            transcript = await self._asr.transcribe(audio)
+        except ASRError as exc:
+            await session.send(ErrorMessage(code=exc.code, message=exc.message))
+            await session.set_state(AppState.IDLE)
+            return
+        if not transcript:
+            await session.send(
+                ErrorMessage(
+                    code="asr_empty",
+                    message="Je n'ai rien entendu de clair — parle un peu plus fort ?",
+                )
+            )
+            await session.set_state(AppState.IDLE)
+            return
+        await session.send(UserTranscript(text=transcript))
+        await self._generate_reply(session, transcript)
+
+    async def _generate_reply(self, session: Session, user_text: str) -> None:
         conversation = session.conversation
-        conversation.add_user(message.text)
+        conversation.add_user(user_text)
         await session.set_state(AppState.THINKING)
 
         try:

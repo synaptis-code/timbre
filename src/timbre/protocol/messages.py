@@ -14,7 +14,7 @@ from timbre.protocol.states import AppState
 
 
 class UserMessage(BaseModel):
-    """Client → serveur : texte saisi (ou transcrit, à partir de la Phase 4)."""
+    """Client → serveur : texte saisi au clavier."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -22,9 +22,17 @@ class UserMessage(BaseModel):
     text: str = Field(min_length=1)
 
 
-# Deviendra une union discriminée quand d'autres messages client arriveront
-# (interrupt, partage d'écran, …).
-ClientMessage = UserMessage
+class UserAudio(BaseModel):
+    """Client → serveur : une prise de parole détectée par le VAD (WAV 16 kHz mono)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["user_audio"] = "user_audio"
+    audio_b64: str = Field(min_length=1)
+    format: Literal["wav"] = "wav"
+
+
+ClientMessage = Annotated[UserMessage | UserAudio, Field(discriminator="type")]
 
 
 class AiChunk(BaseModel):
@@ -57,6 +65,13 @@ class ModelInfo(BaseModel):
     model: str
 
 
+class UserTranscript(BaseModel):
+    """Serveur → client : ce que l'ASR a compris (affiché comme bulle utilisateur)."""
+
+    type: Literal["user_transcript"] = "user_transcript"
+    text: str
+
+
 class AiAudio(BaseModel):
     """Serveur → client : audio d'une phrase de la réponse, à jouer dans l'ordre reçu.
 
@@ -70,7 +85,7 @@ class AiAudio(BaseModel):
 
 
 # Union nue pour typer les paramètres ; version annotée pour la (dé)sérialisation.
-AnyServerMessage = AiChunk | StateChange | ErrorMessage | ModelInfo | AiAudio
+AnyServerMessage = AiChunk | StateChange | ErrorMessage | ModelInfo | AiAudio | UserTranscript
 ServerMessage = Annotated[AnyServerMessage, Field(discriminator="type")]
 
 client_message_adapter: TypeAdapter[ClientMessage] = TypeAdapter(ClientMessage)

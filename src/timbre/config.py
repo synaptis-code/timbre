@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     # None = auto-détection du modèle chargé dans LM Studio (recommandé).
     llm_model: str | None = None
     llm_temperature: float = 0.8
+    # ASR (faster-whisper — nécessite `uv sync --extra asr`)
+    asr_enabled: bool = True
+    asr_model: str = "large-v3-turbo"
+    asr_device: str = "cuda"  # "cpu" si pas de GPU NVIDIA ou VRAM saturée
+    asr_language: str = "fr"
+
     # TTS (edge-tts par défaut ; deviendra un choix de plugin avec les personas)
     tts_enabled: bool = True
     tts_voice: str = "fr-FR-VivienneMultilingualNeural"

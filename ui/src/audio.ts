@@ -4,11 +4,22 @@ export class AudioQueue {
   private queue: string[] = []; // object URLs en attente
   private current: HTMLAudioElement | null = null;
 
+  private readonly onActiveChange?: (active: boolean) => void;
+
+  /** `onActiveChange(true)` au début d'une lecture, `false` quand la file est vide
+   * (sert au mute anti-feedback du micro). */
+  constructor(onActiveChange?: (active: boolean) => void) {
+    this.onActiveChange = onActiveChange;
+  }
+
   enqueue(audioB64: string, mimeType = "audio/mpeg"): void {
     const bytes = Uint8Array.from(atob(audioB64), (char) => char.charCodeAt(0));
     const url = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
     this.queue.push(url);
-    if (this.current === null) this.playNext();
+    if (this.current === null) {
+      this.onActiveChange?.(true);
+      this.playNext();
+    }
   }
 
   /** Coupe la lecture et vide la file (déconnexion, interruption). */
@@ -18,6 +29,7 @@ export class AudioQueue {
     if (this.current !== null) {
       this.current.pause();
       this.current = null;
+      this.onActiveChange?.(false);
     }
   }
 
@@ -25,6 +37,7 @@ export class AudioQueue {
     const url = this.queue.shift();
     if (url === undefined) {
       this.current = null;
+      this.onActiveChange?.(false);
       return;
     }
     const audio = new Audio(url);

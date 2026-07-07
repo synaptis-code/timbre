@@ -172,6 +172,27 @@ body {
   padding: 0.75rem 0 1rem;
 }
 
+.action-mic {
+  padding: 0.65rem 0.9rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.action-mic--on {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.action-mic:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .action-input {
   flex: 1;
   padding: 0.65rem 0.9rem;

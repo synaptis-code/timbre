@@ -40,11 +40,21 @@ class LLMBackend(ABC):
         """Libère les ressources (connexions HTTP…). No-op par défaut."""
 
 
+class ASRError(Exception):
+    """Erreur ASR destinée à l'utilisateur : code stable + message clair."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
 class ASRBackend(ABC):
     """Transcription parole → texte."""
 
     @abstractmethod
-    async def transcribe(self, audio: bytes) -> str: ...
+    async def transcribe(self, audio: bytes) -> str:
+        """Transcrit un enregistrement (WAV/MP3…). Lève `ASRError` en cas de problème."""
 
 
 class TTSError(Exception):

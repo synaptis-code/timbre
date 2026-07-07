@@ -11,6 +11,7 @@ dist/
 # Node / UI
 node_modules/
 ui/dist/
+ui/public/vad/
 
 # IDE / OS
 .idea/

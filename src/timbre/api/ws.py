@@ -13,6 +13,7 @@ from timbre.protocol.messages import (
     ErrorMessage,
     ProtocolError,
     StateChange,
+    UserMessage,
     parse_client_message,
 )
 from timbre.protocol.states import AppState
@@ -48,7 +49,10 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 await session.send(ErrorMessage(code=exc.code, message=exc.message))
                 continue
             try:
-                await orchestrator.handle_user_message(session, message)
+                if isinstance(message, UserMessage):
+                    await orchestrator.handle_user_message(session, message)
+                else:
+                    await orchestrator.handle_user_audio(session, message)
             except Exception:
                 logger.exception("erreur pendant le traitement du message")
                 await session.send(

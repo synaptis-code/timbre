@@ -2,10 +2,12 @@ import { useState, type FormEvent } from "react";
 
 interface ActionBarProps {
   disabled: boolean;
+  micOn: boolean;
+  onToggleMic: () => void;
   onSend: (text: string) => void;
 }
 
-export function ActionBar({ disabled, onSend }: ActionBarProps) {
+export function ActionBar({ disabled, micOn, onToggleMic, onSend }: ActionBarProps) {
   const [draft, setDraft] = useState("");
 
   const submit = (event: FormEvent) => {
@@ -18,6 +20,16 @@ export function ActionBar({ disabled, onSend }: ActionBarProps) {
 
   return (
     <form className="action-bar" onSubmit={submit}>
+      <button
+        type="button"
+        className={`action-mic ${micOn ? "action-mic--on" : ""}`}
+        onClick={onToggleMic}
+        disabled={disabled}
+        aria-pressed={micOn}
+        title={micOn ? "Couper le micro" : "Activer le micro (mains-libres)"}
+      >
+        {micOn ? "Micro ●" : "Micro ○"}
+      </button>
       <input
         className="action-input"
         value={draft}

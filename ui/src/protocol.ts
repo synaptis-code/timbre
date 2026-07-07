@@ -9,7 +9,12 @@ export interface UserMessage {
   type: "user_message";
   text: string;
 }
-export type ClientMessage = UserMessage;
+export interface UserAudio {
+  type: "user_audio";
+  audio_b64: string;
+  format: "wav";
+}
+export type ClientMessage = UserMessage | UserAudio;
 
 // Serveur → client
 export interface AiChunk {
@@ -36,7 +41,17 @@ export interface AiAudio {
   format: "mp3";
   text: string;
 }
-export type ServerMessage = AiChunk | StateChange | ErrorMessage | ModelInfo | AiAudio;
+export interface UserTranscript {
+  type: "user_transcript";
+  text: string;
+}
+export type ServerMessage =
+  | AiChunk
+  | StateChange
+  | ErrorMessage
+  | ModelInfo
+  | AiAudio
+  | UserTranscript;
 
 const SERVER_MESSAGE_TYPES = new Set([
   "ai_chunk",
@@ -44,6 +59,7 @@ const SERVER_MESSAGE_TYPES = new Set([
   "error",
   "model_info",
   "ai_audio",
+  "user_transcript",
 ]);
 
 export function parseServerMessage(raw: string): ServerMessage | null {

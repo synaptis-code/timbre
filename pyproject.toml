@@ -15,6 +15,15 @@ dependencies = [
     "edge-tts>=7.2.8",
 ]
 
+[project.optional-dependencies]
+# ASR GPU : `uv sync --extra asr`. Les wheels nvidia fournissent les DLL
+# cublas/cudnn requises par faster-whisper sous Windows (voir plugins/asr/cuda.py).
+asr = [
+    "faster-whisper>=1.1",
+    "nvidia-cublas-cu12>=12.4; platform_system == 'Windows'",
+    "nvidia-cudnn-cu12>=9.1; platform_system == 'Windows'",
+]
+
 [project.scripts]
 timbre = "timbre.__main__:main"
 
@@ -61,6 +70,10 @@ strict = true
 python_version = "3.12"
 mypy_path = "src"
 packages = ["timbre"]
+
+[[tool.mypy.overrides]]
+module = ["faster_whisper.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
