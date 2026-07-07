@@ -66,6 +66,20 @@
             "title": "Format",
             "type": "string"
           },
+          "image": {
+            "anyOf": [
+              {
+                "maxLength": 8000000,
+                "pattern": "^data:image/(jpeg|png|webp);base64,",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Image"
+          },
           "type": {
             "const": "user_audio",
             "default": "user_audio",
@@ -81,8 +95,22 @@
       },
       "UserMessage": {
         "additionalProperties": false,
-        "description": "Client → serveur : texte saisi au clavier.",
+        "description": "Client → serveur : texte saisi au clavier (+ capture d'écran éventuelle).",
         "properties": {
+          "image": {
+            "anyOf": [
+              {
+                "maxLength": 8000000,
+                "pattern": "^data:image/(jpeg|png|webp);base64,",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Image"
+          },
           "text": {
             "minLength": 1,
             "title": "Text",

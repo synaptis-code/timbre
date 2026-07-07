@@ -41,6 +41,10 @@ class LLMBackend(ABC):
         `temperature=None` : valeur par défaut du backend (les personas la surchargent).
         """
 
+    async def supports_vision(self) -> bool | None:
+        """Le modèle actif accepte-t-il les images ? None = indéterminé (on tente)."""
+        return None
+
     async def aclose(self) -> None:  # noqa: B027 — no-op volontaire, surcharge optionnelle
         """Libère les ressources (connexions HTTP…). No-op par défaut."""
 

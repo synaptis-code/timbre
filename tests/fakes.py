@@ -17,12 +17,14 @@ class FakeLLM(LLMBackend):
         error: LLMError | None = None,
         fail_after: int | None = None,
         delay: float = 0.0,
+        vision: bool | None = True,
     ) -> None:
         self.tokens = tokens if tokens is not None else ["Bon", "jour", " !"]
         self.model = model
         self.error = error
         self.fail_after = fail_after
         self.delay = delay
+        self.vision = vision
         self.received_messages: list[list[dict[str, object]]] = []
         self.received_temperatures: list[float | None] = []
 
@@ -30,6 +32,9 @@ class FakeLLM(LLMBackend):
         if self.error is not None:
             raise self.error
         return self.model
+
+    async def supports_vision(self) -> bool | None:
+        return self.vision
 
     async def stream_chat(
         self, messages: list[dict[str, object]], temperature: float | None = None

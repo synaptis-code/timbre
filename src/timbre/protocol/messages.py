@@ -12,14 +12,20 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from timbre.protocol.states import AppState
 
+# Capture d'écran jointe à un tour : data-URL JPEG/PNG/WebP, taille bornée.
+_IMAGE_FIELD = Field(
+    default=None, pattern=r"^data:image/(jpeg|png|webp);base64,", max_length=8_000_000
+)
+
 
 class UserMessage(BaseModel):
-    """Client → serveur : texte saisi au clavier."""
+    """Client → serveur : texte saisi au clavier (+ capture d'écran éventuelle)."""
 
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["user_message"] = "user_message"
     text: str = Field(min_length=1)
+    image: str | None = _IMAGE_FIELD
 
 
 class UserAudio(BaseModel):
@@ -30,6 +36,7 @@ class UserAudio(BaseModel):
     type: Literal["user_audio"] = "user_audio"
     audio_b64: str = Field(min_length=1)
     format: Literal["wav"] = "wav"
+    image: str | None = _IMAGE_FIELD
 
 
 class Interrupt(BaseModel):

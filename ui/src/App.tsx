@@ -4,6 +4,7 @@ import { ActionBar } from "./components/ActionBar";
 import { ChatThread, type ChatMessage } from "./components/ChatThread";
 import { StateIndicator } from "./components/StateIndicator";
 import { MicController } from "./mic";
+import { ScreenShare } from "./screen";
 import { PersonaSelect } from "./components/PersonaSelect";
 import type { AppState, PersonaSummary, ServerMessage } from "./protocol";
 import { TimbreSocket, type ConnectionStatus } from "./ws";
@@ -13,12 +14,14 @@ export default function App() {
   const [appState, setAppState] = useState<AppState>("idle");
   const [modelName, setModelName] = useState<string | null>(null);
   const [micOn, setMicOn] = useState(false);
+  const [screenOn, setScreenOn] = useState(false);
   const [ttsPlaying, setTtsPlaying] = useState(false);
   const [personas, setPersonas] = useState<PersonaSummary[]>([]);
   const [activePersona, setActivePersona] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const socketRef = useRef<TimbreSocket | null>(null);
   const micRef = useRef<MicController | null>(null);
+  const screenRef = useRef<ScreenShare | null>(null);
   const audioRef = useRef<AudioQueue | null>(null);
   const nextId = useRef(0);
 
@@ -27,9 +30,21 @@ export default function App() {
       setMessages((prev) => [...prev, { ...message, id: nextId.current++ }]);
     };
 
+    const screen = new ScreenShare({
+      onStatus: setScreenOn,
+      onError: (message) => append({ role: "error", text: message }),
+    });
+    screenRef.current = screen;
+
     const mic = new MicController({
       onSpeech: (wavB64) => {
-        socketRef.current?.send({ type: "user_audio", audio_b64: wavB64, format: "wav" });
+        const image = screen.isOn ? screen.captureFrame() : null;
+        socketRef.current?.send({
+          type: "user_audio",
+          audio_b64: wavB64,
+          format: "wav",
+          ...(image !== null ? { image } : {}),
+        });
       },
       onStatus: setMicOn,
       onError: (message) => append({ role: "error", text: message }),
@@ -93,13 +108,24 @@ export default function App() {
       socket.dispose();
       audioQueue.stop();
       mic.destroy();
+      screen.stop();
     };
   }, []);
 
   const sendUserMessage = (text: string) => {
-    const sent = socketRef.current?.send({ type: "user_message", text }) ?? false;
+    const screen = screenRef.current;
+    const image = screen !== null && screen.isOn ? screen.captureFrame() : null;
+    const sent =
+      socketRef.current?.send({
+        type: "user_message",
+        text,
+        ...(image !== null ? { image } : {}),
+      }) ?? false;
     if (sent) {
-      setMessages((prev) => [...prev, { id: nextId.current++, role: "user", text }]);
+      setMessages((prev) => [
+        ...prev,
+        { id: nextId.current++, role: "user", text, withImage: image !== null },
+      ]);
     }
   };
 
@@ -142,8 +168,10 @@ export default function App() {
       <ActionBar
         disabled={status !== "connected"}
         micOn={micOn}
+        screenOn={screenOn}
         canStop={canStop}
         onToggleMic={() => void micRef.current?.toggle()}
+        onToggleScreen={() => void screenRef.current?.toggle()}
         onStop={stopTurn}
         onSend={sendUserMessage}
       />

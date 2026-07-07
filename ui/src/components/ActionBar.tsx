@@ -3,13 +3,24 @@ import { useState, type FormEvent } from "react";
 interface ActionBarProps {
   disabled: boolean;
   micOn: boolean;
+  screenOn: boolean;
   canStop: boolean;
   onToggleMic: () => void;
+  onToggleScreen: () => void;
   onStop: () => void;
   onSend: (text: string) => void;
 }
 
-export function ActionBar({ disabled, micOn, canStop, onToggleMic, onStop, onSend }: ActionBarProps) {
+export function ActionBar({
+  disabled,
+  micOn,
+  screenOn,
+  canStop,
+  onToggleMic,
+  onToggleScreen,
+  onStop,
+  onSend,
+}: ActionBarProps) {
   const [draft, setDraft] = useState("");
 
   const submit = (event: FormEvent) => {
@@ -31,6 +42,20 @@ export function ActionBar({ disabled, micOn, canStop, onToggleMic, onStop, onSen
         title={micOn ? "Couper le micro" : "Activer le micro (mains-libres)"}
       >
         {micOn ? "Micro ●" : "Micro ○"}
+      </button>
+      <button
+        type="button"
+        className={`action-mic ${screenOn ? "action-mic--on" : ""}`}
+        onClick={onToggleScreen}
+        disabled={disabled}
+        aria-pressed={screenOn}
+        title={
+          screenOn
+            ? "Arrêter le partage d'écran"
+            : "Partager l'écran (une capture par tour est envoyée à l'IA)"
+        }
+      >
+        {screenOn ? "Écran ●" : "Écran ○"}
       </button>
       <button
         type="button"

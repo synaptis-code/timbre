@@ -272,6 +272,13 @@ body {
   font-size: 0.8em;
 }
 
+.bubble--with-image::after {
+  content: " — écran partagé";
+  opacity: 0.6;
+  font-style: italic;
+  font-size: 0.8em;
+}
+
 /* — Barre d'action — */
 .action-bar {
   display: flex;

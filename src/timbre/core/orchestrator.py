@@ -120,7 +120,7 @@ class Orchestrator:
     # ── Tours de conversation ───────────────────────────────────────────────
 
     async def handle_user_message(self, session: Session, message: UserMessage) -> None:
-        await self._generate_reply(session, message.text)
+        await self._generate_reply(session, message.text, image=message.image)
 
     async def handle_user_audio(self, session: Session, message: UserAudio) -> None:
         """Une prise de parole : transcription puis tour de conversation normal."""
@@ -157,22 +157,39 @@ class Orchestrator:
             await session.set_state(AppState.IDLE)
             return
         await session.send(UserTranscript(text=transcript))
-        await self._generate_reply(session, transcript)
+        await self._generate_reply(session, transcript, image=message.image)
 
-    async def _generate_reply(self, session: Session, user_text: str) -> None:
+    async def _generate_reply(
+        self, session: Session, user_text: str, image: str | None = None
+    ) -> None:
         conversation = session.conversation
-        conversation.add_user(user_text)
         await session.set_state(AppState.THINKING)
 
         try:
             model = await self._llm.active_model()
         except LLMError as exc:
+            conversation.add_user(user_text)  # la question reste dans l'historique
             await session.send(ErrorMessage(code=exc.code, message=exc.message))
             await session.set_state(AppState.IDLE)
             return
         # Ré-annoncé à chaque tour : si l'utilisateur change de modèle dans
         # LM Studio, l'UI le reflète immédiatement.
         await session.send(ModelInfo(model=model))
+
+        # Garde vision : si le modèle chargé ne voit pas les images, on le dit
+        # et on continue en texte seul — jamais d'échec silencieux ni de crash.
+        if image is not None and await self._llm.supports_vision() is False:
+            await session.send(
+                ErrorMessage(
+                    code="no_vision",
+                    message=(
+                        f"Le modèle « {model} » ne voit pas les images — capture ignorée. "
+                        "Charge un modèle vision (ex. qwen2.5-vl) dans LM Studio."
+                    ),
+                )
+            )
+            image = None
+        conversation.add_user(user_text, image=image)
 
         splitter = SentenceSplitter()
         sentences: asyncio.Queue[str | None] = asyncio.Queue()

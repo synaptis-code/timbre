@@ -38,6 +38,8 @@ class LMStudioBackend(LLMBackend):
         self._temperature = temperature
         self._client = client or httpx2.AsyncClient(timeout=httpx2.Timeout(10.0, read=300.0))
         self._warned_reasoning_model: str | None = None
+        # Type du dernier modèle résolu ("llm" | "vlm" | None si inconnu).
+        self._active_model_type: str | None = None
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -50,7 +52,7 @@ class LMStudioBackend(LLMBackend):
         response = await self._get("/api/v0/models")
         if response.status_code == 200:
             loaded = [
-                str(entry["id"])
+                entry
                 for entry in response.json().get("data", [])
                 if entry.get("state") == "loaded" and entry.get("type") in ("llm", "vlm")
             ]
@@ -59,8 +61,10 @@ class LMStudioBackend(LLMBackend):
                     "no_model_loaded", f"Aucun modèle chargé dans LM Studio. {_LOAD_HINT}"
                 )
             if len(loaded) > 1:
-                logger.info("plusieurs modèles chargés %s → utilisation de %s", loaded, loaded[0])
-            return loaded[0]
+                ids = [str(entry["id"]) for entry in loaded]
+                logger.info("plusieurs modèles chargés %s → utilisation de %s", ids, ids[0])
+            self._active_model_type = str(loaded[0].get("type") or "") or None
+            return str(loaded[0]["id"])
 
         # Repli pour les versions de LM Studio sans /api/v0 : /v1/models liste les
         # modèles servis (sans état de chargement).
@@ -75,7 +79,14 @@ class LMStudioBackend(LLMBackend):
             raise LLMError(
                 "no_model_loaded", f"Aucun modèle disponible dans LM Studio. {_LOAD_HINT}"
             )
+        self._active_model_type = None  # /v1/models ne donne pas le type
         return str(entries[0]["id"])
+
+    async def supports_vision(self) -> bool | None:
+        """Fondé sur le type ("llm"/"vlm") du dernier modèle résolu par active_model."""
+        if self._model_override is not None or self._active_model_type is None:
+            return None
+        return self._active_model_type == "vlm"
 
     async def stream_chat(
         self, messages: list[dict[str, object]], temperature: float | None = None

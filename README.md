@@ -26,6 +26,8 @@ npm run dev                 # ouvre http://localhost:5173
 
 Clique **Micro ○** dans l'UI et autorise le micro : le mode mains-libres est continu — parle, Timbre transcrit (Whisper sur GPU), répond et parle. Le micro est automatiquement mis en pause pendant que l'IA parle (anti-larsen). Sans GPU NVIDIA : `TIMBRE_ASR_DEVICE=cpu`.
 
+**Vision** : clique **Écran ○** et choisis une fenêtre — une capture (JPEG ≤ 1280 px) accompagne chaque tour, à la voix comme au clavier. Nécessite un modèle **vision** chargé dans LM Studio (ex. `qwen2.5-vl-7b`) ; avec un modèle texte, Timbre le signale et répond en texte seul. Seule la capture la plus récente reste dans l'historique (contexte maîtrisé).
+
 Sous Windows, forcer l'UTF-8 évite tout souci d'accents dans la console : `$env:PYTHONUTF8 = "1"`.
 
 ## Vérifications qualité
@@ -76,7 +78,7 @@ Le protocole WebSocket (messages `user_message`, `ai_chunk`, `state_change`, `er
 | 5 | Interruption (Stop / nouvelle prise de parole), états fidèles, anti-larsen | ✅ |
 | 6 | Personas robustes (JSON validé, isolation, zéro fallback silencieux) | ✅ |
 | 7 | Polish UI : thème, orbe d'état, transitions, code-splitting | ✅ |
-| 8 | Vision (partage d'écran par tour) | ⏳ |
+| 8 | Vision : partage d'écran, une capture par tour vers le LLM multimodal | ✅ |
 | 9 | Optimisation latence / VRAM | ⏳ |
 
 ## Licence

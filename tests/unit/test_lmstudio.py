@@ -58,6 +58,22 @@ async def test_active_model_unreachable():
     assert exc_info.value.code == "llm_unreachable"
 
 
+async def test_supports_vision_follows_active_model_type():
+    entries = [{"id": "qwen2.5-vl-7b", "type": "vlm", "state": "loaded"}]
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return models_v0(*entries)
+
+    backend = make_backend(handler)
+    assert await backend.supports_vision() is None  # rien résolu encore
+    await backend.active_model()
+    assert await backend.supports_vision() is True
+
+    entries[0] = {"id": "gemma-3-1b", "type": "llm", "state": "loaded"}
+    await backend.active_model()
+    assert await backend.supports_vision() is False
+
+
 async def test_model_override_skips_detection():
     def handler(request: httpx2.Request) -> httpx2.Response:
         raise AssertionError("aucune requête attendue quand le modèle est forcé")

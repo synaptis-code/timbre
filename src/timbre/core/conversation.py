@@ -15,8 +15,33 @@ class Conversation:
         """Changement de persona : effet immédiat, l'historique est conservé."""
         self._system_prompt = system_prompt
 
-    def add_user(self, text: str) -> None:
-        self._turns.append({"role": "user", "content": text})
+    def add_user(self, text: str, image: str | None = None) -> None:
+        """`image` : data-URL d'une capture d'écran (format multimodal OpenAI).
+
+        Seule la capture la plus récente est conservée dans l'historique : les
+        images des tours précédents sont remplacées par un marqueur texte pour
+        ne pas faire exploser le contexte (une image ≈ un millier de tokens).
+        """
+        if image is None:
+            self._turns.append({"role": "user", "content": text})
+            return
+        self._strip_old_images()
+        self._turns.append(
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": text},
+                    {"type": "image_url", "image_url": {"url": image}},
+                ],
+            }
+        )
+
+    def _strip_old_images(self) -> None:
+        for turn in self._turns:
+            content = turn["content"]
+            if isinstance(content, list):
+                text = next((str(p["text"]) for p in content if p.get("type") == "text"), "")
+                turn["content"] = f"{text} [capture d'écran précédente retirée]"
 
     def add_assistant(self, text: str) -> None:
         """Archive le texte effectivement émis. Un tour vide n'est pas archivé."""

@@ -8,11 +8,14 @@ export type AppState = "idle" | "listening" | "thinking" | "speaking";
 export interface UserMessage {
   type: "user_message";
   text: string;
+  /** Capture d'écran du tour (data-URL JPEG), si le partage est actif. */
+  image?: string;
 }
 export interface UserAudio {
   type: "user_audio";
   audio_b64: string;
   format: "wav";
+  image?: string;
 }
 export interface Interrupt {
   type: "interrupt";

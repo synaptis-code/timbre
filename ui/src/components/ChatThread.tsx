@@ -8,6 +8,8 @@ export interface ChatMessage {
   streaming?: boolean;
   /** Tour coupé (Stop ou nouvelle prise de parole) : affiché tel quel, marqué. */
   interrupted?: boolean;
+  /** Une capture d'écran accompagnait ce message. */
+  withImage?: boolean;
 }
 
 const NEAR_BOTTOM_PX = 160;
@@ -41,6 +43,7 @@ export function ChatThread({ messages }: { messages: ChatMessage[] }) {
               `bubble--${message.role}`,
               message.streaming ? "bubble--streaming" : "",
               message.interrupted ? "bubble--interrupted" : "",
+              message.withImage ? "bubble--with-image" : "",
             ]
               .filter(Boolean)
               .join(" ")}
