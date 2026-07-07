@@ -10,28 +10,45 @@ export interface ChatMessage {
   interrupted?: boolean;
 }
 
-export function ChatThread({ messages }: { messages: ChatMessage[] }) {
-  const endRef = useRef<HTMLDivElement>(null);
+const NEAR_BOTTOM_PX = 160;
 
+export function ChatThread({ messages }: { messages: ChatMessage[] }) {
+  const containerRef = useRef<HTMLElement>(null);
+
+  // Suit le flux seulement si l'utilisateur est déjà en bas : on ne lui
+  // arrache jamais la lecture d'un message plus haut.
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = containerRef.current;
+    if (container === null) return;
+    const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (distance < NEAR_BOTTOM_PX) {
+      container.scrollTo({ top: container.scrollHeight });
+    }
   }, [messages]);
 
   return (
-    <main className="thread">
+    <main className="thread" ref={containerRef}>
       {messages.length === 0 ? (
-        <p className="thread-empty">Aucun message pour l'instant. Écris quelque chose !</p>
+        <p className="thread-empty">
+          Active le micro et parle, ou écris un message pour commencer.
+        </p>
       ) : (
         messages.map((message) => (
           <div
             key={message.id}
-            className={`bubble bubble--${message.role} ${message.interrupted ? "bubble--interrupted" : ""}`}
+            className={[
+              "bubble",
+              `bubble--${message.role}`,
+              message.streaming ? "bubble--streaming" : "",
+              message.interrupted ? "bubble--interrupted" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
           >
             {message.text}
           </div>
         ))
       )}
-      <div ref={endRef} />
     </main>
   );
 }

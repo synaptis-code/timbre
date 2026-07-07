@@ -7,10 +7,12 @@ const LABELS: Record<AppState, string> = {
   speaking: "Parle",
 };
 
+/** Indicateur central unique : un orbe dont la couleur et la respiration
+ * suivent l'état — compréhensible en un coup d'œil (§4 du plan). */
 export function StateIndicator({ state }: { state: AppState }) {
   return (
     <div className={`state state--${state}`} role="status" aria-live="polite">
-      <span className="state-dot" aria-hidden="true" />
+      <span className="state-orb" aria-hidden="true" />
       <span className="state-label">{LABELS[state]}</span>
     </div>
   );

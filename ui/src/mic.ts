@@ -1,4 +1,4 @@
-import { MicVAD } from "@ricky0123/vad-web";
+import type { MicVAD } from "@ricky0123/vad-web";
 import { encodeWavBase64 } from "./wav";
 
 const VAD_SAMPLE_RATE = 16000;
@@ -40,16 +40,20 @@ export class MicController {
     if (this.vad === null) {
       if (this.starting) return;
       this.starting = true;
-      const vadPromise = MicVAD.new({
-        model: "v5",
-        baseAssetPath: "/vad/",
-        onnxWASMBasePath: "/vad/",
-        onSpeechEnd: (audio: Float32Array) => {
-          if (this.wantedOn && !this.ttsPlaying) {
-            this.handlers.onSpeech(encodeWavBase64(audio, VAD_SAMPLE_RATE));
-          }
-        },
-      });
+      // Import dynamique : le runtime VAD/ONNX (~400 Ko) n'est chargé qu'au
+      // premier usage du micro — démarrage de l'app plus léger.
+      const vadPromise = import("@ricky0123/vad-web").then((vadModule) =>
+        vadModule.MicVAD.new({
+          model: "v5",
+          baseAssetPath: "/vad/",
+          onnxWASMBasePath: "/vad/",
+          onSpeechEnd: (audio: Float32Array) => {
+            if (this.wantedOn && !this.ttsPlaying) {
+              this.handlers.onSpeech(encodeWavBase64(audio, VAD_SAMPLE_RATE));
+            }
+          },
+        }),
+      );
       try {
         // Jamais de blocage silencieux : si l'init pend (permission ignorée,
         // navigateur récalcitrant), on le dit et on libère le bouton.

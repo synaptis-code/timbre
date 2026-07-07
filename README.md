@@ -75,7 +75,7 @@ Le protocole WebSocket (messages `user_message`, `ai_chunk`, `state_change`, `er
 | 4 | ASR + VAD : micro mains-libres → Whisper GPU → boucle vocale complète | ✅ |
 | 5 | Interruption (Stop / nouvelle prise de parole), états fidèles, anti-larsen | ✅ |
 | 6 | Personas robustes (JSON validé, isolation, zéro fallback silencieux) | ✅ |
-| 7 | Polish UI | ⏳ |
+| 7 | Polish UI : thème, orbe d'état, transitions, code-splitting | ✅ |
 | 8 | Vision (partage d'écran par tour) | ⏳ |
 | 9 | Optimisation latence / VRAM | ⏳ |
 

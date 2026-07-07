@@ -1,17 +1,17 @@
 :root {
-  --bg: #101317;
-  --surface: #181c22;
-  --surface-2: #1f242c;
-  --border: #2a303a;
-  --text: #e8eaed;
-  --text-dim: #9aa2ad;
+  --bg: #0e1116;
+  --surface: #161b22;
+  --surface-2: #1d232c;
+  --border: #293039;
+  --text: #e9ecef;
+  --text-dim: #98a1ac;
   --accent: #7aa2f7;
   --ok: #4ade80;
   --warn: #fbbf24;
   --error: #f87171;
 
   color-scheme: dark;
-  font: 16px/1.5 system-ui, "Segoe UI", Roboto, sans-serif;
+  font: 16px/1.55 system-ui, "Segoe UI", Roboto, sans-serif;
 }
 
 * {
@@ -22,6 +22,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  -webkit-font-smoothing: antialiased;
 }
 
 #root,
@@ -40,28 +41,28 @@ body {
 /* — En-tête — */
 .app-header {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 1rem 0 0.5rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 0 0.6rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .app-title {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
 }
 
 .model-badge {
   margin-right: auto;
-  margin-left: 0.75rem;
   padding: 0.15rem 0.55rem;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface);
   color: var(--text-dim);
-  font-size: 0.75rem;
-  max-width: 45%;
+  font-size: 0.72rem;
+  max-width: 40%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -71,13 +72,13 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  margin-right: 0.75rem;
 }
 
 .persona-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  transition: background-color 0.3s ease;
 }
 
 .persona-dot--ok {
@@ -93,10 +94,15 @@ body {
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 0.5rem;
-  padding: 0.25rem 0.5rem;
+  padding: 0.3rem 0.5rem;
   font: inherit;
   font-size: 0.85rem;
   max-width: 10rem;
+  transition: border-color 0.15s ease;
+}
+
+.persona-select:hover:not(:disabled) {
+  border-color: var(--text-dim);
 }
 
 .persona-select:disabled {
@@ -104,8 +110,9 @@ body {
 }
 
 .connection {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--text-dim);
+  white-space: nowrap;
 }
 
 .connection--connected {
@@ -116,43 +123,76 @@ body {
   color: var(--error);
 }
 
-/* — Indicateur d'état — */
+/* — Indicateur d'état central (orbe) — */
 .state {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
   justify-content: center;
-  padding: 0.5rem 0;
+  gap: 0.6rem;
+  padding: 0.9rem 0 0.5rem;
   color: var(--text-dim);
   font-size: 0.9rem;
 }
 
-.state-dot {
-  width: 10px;
-  height: 10px;
+.state-orb {
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  background: var(--text-dim);
+  background: var(--surface-2);
+  box-shadow: 0 0 0 0 transparent;
+  transition:
+    background-color 0.35s ease,
+    box-shadow 0.35s ease;
 }
 
-.state--listening .state-dot {
+.state-label {
+  transition: color 0.35s ease;
+  min-width: 6rem;
+}
+
+.state--listening .state-orb {
   background: var(--ok);
-  animation: pulse 1.2s ease-in-out infinite;
+  box-shadow: 0 0 14px 1px color-mix(in srgb, var(--ok) 55%, transparent);
+  animation: breathe 2.4s ease-in-out infinite;
 }
 
-.state--thinking .state-dot {
+.state--listening .state-label {
+  color: var(--ok);
+}
+
+.state--thinking .state-orb {
   background: var(--warn);
-  animation: pulse 0.8s ease-in-out infinite;
+  box-shadow: 0 0 14px 1px color-mix(in srgb, var(--warn) 55%, transparent);
+  animation: breathe 0.9s ease-in-out infinite;
 }
 
-.state--speaking .state-dot {
+.state--thinking .state-label {
+  color: var(--warn);
+}
+
+.state--speaking .state-orb {
   background: var(--accent);
-  animation: pulse 0.6s ease-in-out infinite;
+  box-shadow: 0 0 16px 2px color-mix(in srgb, var(--accent) 60%, transparent);
+  animation: talk 0.55s ease-in-out infinite;
 }
 
-@keyframes pulse {
+.state--speaking .state-label {
+  color: var(--accent);
+}
+
+@keyframes breathe {
   50% {
-    opacity: 0.35;
     transform: scale(1.35);
+    opacity: 0.75;
+  }
+}
+
+@keyframes talk {
+  25% {
+    transform: scaleY(1.45);
+  }
+  75% {
+    transform: scaleY(0.75);
   }
 }
 
@@ -162,43 +202,74 @@ body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem 0;
+  gap: 0.55rem;
+  padding: 0.75rem 0.25rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
 
 .thread-empty {
   margin: auto;
   color: var(--text-dim);
+  text-align: center;
+  max-width: 26rem;
 }
 
 .bubble {
   max-width: 80%;
   padding: 0.6rem 0.9rem;
-  border-radius: 1rem;
+  border-radius: 1.1rem;
   white-space: pre-wrap;
   overflow-wrap: break-word;
+  animation: rise 0.18s ease-out;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 .bubble--user {
   align-self: flex-end;
   background: var(--accent);
-  color: #10131a;
-  border-bottom-right-radius: 0.25rem;
+  color: #0e1116;
+  border-bottom-right-radius: 0.3rem;
 }
 
 .bubble--ai {
   align-self: flex-start;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-bottom-left-radius: 0.25rem;
+  border-bottom-left-radius: 0.3rem;
+}
+
+.bubble--streaming::after {
+  content: "▍";
+  color: var(--accent);
+  animation: blink 1s steps(2) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
 }
 
 .bubble--error {
   align-self: center;
   background: transparent;
-  border: 1px solid var(--error);
+  border: 1px solid color-mix(in srgb, var(--error) 55%, transparent);
   color: var(--error);
   font-size: 0.85rem;
+}
+
+.bubble--interrupted::after {
+  content: " — interrompu";
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: 0.8em;
 }
 
 /* — Barre d'action — */
@@ -208,7 +279,8 @@ body {
   padding: 0.75rem 0 1rem;
 }
 
-.action-mic {
+.action-mic,
+.action-stop {
   padding: 0.65rem 0.9rem;
   border-radius: 0.75rem;
   border: 1px solid var(--border);
@@ -217,6 +289,10 @@ body {
   font: inherit;
   cursor: pointer;
   white-space: nowrap;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    opacity 0.15s ease;
 }
 
 .action-mic--on {
@@ -224,34 +300,18 @@ body {
   color: var(--ok);
 }
 
-.action-mic:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
 .action-stop {
-  padding: 0.65rem 0.9rem;
-  border-radius: 0.75rem;
-  border: 1px solid var(--error);
-  background: transparent;
+  border-color: color-mix(in srgb, var(--error) 60%, var(--border));
   color: var(--error);
-  font: inherit;
-  cursor: pointer;
-  white-space: nowrap;
+  background: transparent;
 }
 
+.action-mic:disabled,
 .action-stop:disabled {
-  opacity: 0.3;
+  opacity: 0.35;
   border-color: var(--border);
   color: var(--text-dim);
   cursor: default;
-}
-
-.bubble--interrupted::after {
-  content: " — interrompu";
-  color: var(--text-dim);
-  font-style: italic;
-  font-size: 0.8em;
 }
 
 .action-input {
@@ -262,6 +322,7 @@ body {
   background: var(--surface);
   color: var(--text);
   font: inherit;
+  transition: border-color 0.15s ease;
 }
 
 .action-input:focus {
@@ -274,13 +335,29 @@ body {
   border-radius: 0.75rem;
   border: none;
   background: var(--accent);
-  color: #10131a;
+  color: #0e1116;
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  transition: opacity 0.15s ease;
 }
 
 .action-send:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: default;
+}
+
+:is(.action-mic, .action-stop, .action-send, .persona-select):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Respect des préférences d'accessibilité : pas d'animation imposée. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }
