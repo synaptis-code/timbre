@@ -6,6 +6,8 @@ export interface ChatMessage {
   text: string;
   /** Bulle IA encore en cours de streaming (le prochain ai_chunk s'y ajoute). */
   streaming?: boolean;
+  /** Tour coupé (Stop ou nouvelle prise de parole) : affiché tel quel, marqué. */
+  interrupted?: boolean;
 }
 
 export function ChatThread({ messages }: { messages: ChatMessage[] }) {
@@ -21,7 +23,10 @@ export function ChatThread({ messages }: { messages: ChatMessage[] }) {
         <p className="thread-empty">Aucun message pour l'instant. Écris quelque chose !</p>
       ) : (
         messages.map((message) => (
-          <div key={message.id} className={`bubble bubble--${message.role}`}>
+          <div
+            key={message.id}
+            className={`bubble bubble--${message.role} ${message.interrupted ? "bubble--interrupted" : ""}`}
+          >
             {message.text}
           </div>
         ))

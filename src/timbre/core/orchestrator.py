@@ -7,6 +7,7 @@ L'ASR/VAD (Phase 4) se branchera en amont.
 
 import asyncio
 import binascii
+import contextlib
 import logging
 from base64 import b64decode, b64encode
 
@@ -110,6 +111,7 @@ class Orchestrator:
             speaker = asyncio.create_task(self._speak_sentences(session, sentences))
 
         emitted: list[str] = []
+        interrupted = False
         try:
             try:
                 async for token in self._llm.stream_chat(conversation.to_messages()):
@@ -118,18 +120,37 @@ class Orchestrator:
                     for sentence in splitter.feed(token):
                         sentences.put_nowait(sentence)
                 await session.send(AiChunk(text="", last=True))
+            except asyncio.CancelledError:
+                # Interruption (bouton Stop ou nouvelle prise de parole) : on coupe
+                # court, sans corrompre l'historique (bug n°3).
+                interrupted = True
             except LLMError as exc:
                 logger.warning("génération interrompue (%s) : %s", exc.code, exc.message)
                 if emitted:
                     await session.send(AiChunk(text="", last=True))
                 await session.send(ErrorMessage(code=exc.code, message=exc.message))
-        finally:
+            # Voix : drain complet en fin normale, coupure sèche si interrompu.
             if speaker is not None:
-                for sentence in splitter.flush():
-                    sentences.put_nowait(sentence)
-                sentences.put_nowait(None)
-                await speaker
-            # Seul le texte réellement émis entre dans l'historique (bug n°3).
+                if interrupted:
+                    speaker.cancel()
+                else:
+                    for sentence in splitter.flush():
+                        sentences.put_nowait(sentence)
+                    sentences.put_nowait(None)
+                with contextlib.suppress(asyncio.CancelledError):
+                    await speaker
+        except asyncio.CancelledError:
+            # Annulation reçue pendant le drain de la voix.
+            interrupted = True
+            if speaker is not None:
+                speaker.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await speaker
+        finally:
+            if interrupted and emitted:
+                await session.send(AiChunk(text="", last=True, interrupted=True))
+            # Seul le texte réellement émis entre dans l'historique (bug n°3) —
+            # un tour interrompu est archivé tel quel, jamais inventé.
             conversation.add_assistant("".join(emitted))
             await session.set_state(AppState.IDLE)
 

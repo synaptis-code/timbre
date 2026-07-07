@@ -3,11 +3,13 @@ import { useState, type FormEvent } from "react";
 interface ActionBarProps {
   disabled: boolean;
   micOn: boolean;
+  canStop: boolean;
   onToggleMic: () => void;
+  onStop: () => void;
   onSend: (text: string) => void;
 }
 
-export function ActionBar({ disabled, micOn, onToggleMic, onSend }: ActionBarProps) {
+export function ActionBar({ disabled, micOn, canStop, onToggleMic, onStop, onSend }: ActionBarProps) {
   const [draft, setDraft] = useState("");
 
   const submit = (event: FormEvent) => {
@@ -29,6 +31,15 @@ export function ActionBar({ disabled, micOn, onToggleMic, onSend }: ActionBarPro
         title={micOn ? "Couper le micro" : "Activer le micro (mains-libres)"}
       >
         {micOn ? "Micro ●" : "Micro ○"}
+      </button>
+      <button
+        type="button"
+        className="action-stop"
+        onClick={onStop}
+        disabled={disabled || !canStop}
+        title="Interrompre la réponse en cours"
+      >
+        Stop
       </button>
       <input
         className="action-input"

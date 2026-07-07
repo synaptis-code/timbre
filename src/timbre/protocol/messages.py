@@ -32,15 +32,28 @@ class UserAudio(BaseModel):
     format: Literal["wav"] = "wav"
 
 
-ClientMessage = Annotated[UserMessage | UserAudio, Field(discriminator="type")]
+class Interrupt(BaseModel):
+    """Client → serveur : stoppe le tour en cours (bouton Stop ou nouvelle prise de parole)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["interrupt"] = "interrupt"
+
+
+ClientMessage = Annotated[UserMessage | UserAudio | Interrupt, Field(discriminator="type")]
 
 
 class AiChunk(BaseModel):
-    """Serveur → client : fragment de réponse en streaming. `last=True` clôt le tour."""
+    """Serveur → client : fragment de réponse en streaming. `last=True` clôt le tour.
+
+    `interrupted=True` sur le fragment de clôture : le tour a été coupé, le texte
+    affiché est exactement ce qui a été généré (et archivé) avant l'interruption.
+    """
 
     type: Literal["ai_chunk"] = "ai_chunk"
     text: str
     last: bool = False
+    interrupted: bool = False
 
 
 class StateChange(BaseModel):

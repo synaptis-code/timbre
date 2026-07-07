@@ -36,10 +36,11 @@ def test_conversation_flow():
 
         assert ws.receive_json() == {"type": "state_change", "state": "thinking"}
         assert ws.receive_json() == {"type": "model_info", "model": "fake-model"}
-        assert ws.receive_json() == {"type": "ai_chunk", "text": "Bon", "last": False}
-        assert ws.receive_json() == {"type": "ai_chunk", "text": "jour", "last": False}
-        assert ws.receive_json() == {"type": "ai_chunk", "text": " !", "last": False}
-        assert ws.receive_json() == {"type": "ai_chunk", "text": "", "last": True}
+        chunk = {"type": "ai_chunk", "last": False, "interrupted": False}
+        assert ws.receive_json() == {**chunk, "text": "Bon"}
+        assert ws.receive_json() == {**chunk, "text": "jour"}
+        assert ws.receive_json() == {**chunk, "text": " !"}
+        assert ws.receive_json() == {**chunk, "text": "", "last": True}
         assert ws.receive_json() == {"type": "state_change", "state": "idle"}
 
 
@@ -88,7 +89,8 @@ def test_stream_failure_archives_partial_text():
             received.append(msg)
         types = [m["type"] for m in received]
         assert "error" in types  # la coupure est signalée…
-        assert {"type": "ai_chunk", "text": "", "last": True} in received  # …la bulle est close
+        closing = {"type": "ai_chunk", "text": "", "last": True, "interrupted": False}
+        assert closing in received  # …la bulle est close
 
         # …et le tour suivant voit exactement le texte partiel réellement émis.
         ws.send_json({"type": "user_message", "text": "Continue"})

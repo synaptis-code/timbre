@@ -1,8 +1,17 @@
-"""Endpoint WebSocket : réception validée, erreurs toujours renvoyées au client."""
+"""Endpoint WebSocket : réception validée, erreurs toujours renvoyées au client.
 
+Le tour de conversation tourne dans une tâche annulable : la boucle de
+réception reste réactive pendant la génération, ce qui permet `interrupt`
+(bouton Stop) et le remplacement d'un tour en cours par une nouvelle prise
+de parole — comportement naturel d'une conversation vocale.
+"""
+
+import asyncio
+import contextlib
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from starlette.websockets import WebSocketState
 
 from timbre.config import Settings
 from timbre.core.conversation import Conversation
@@ -11,8 +20,10 @@ from timbre.core.session import Session
 from timbre.protocol.messages import (
     AnyServerMessage,
     ErrorMessage,
+    Interrupt,
     ProtocolError,
     StateChange,
+    UserAudio,
     UserMessage,
     parse_client_message,
 )
@@ -28,11 +39,45 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     await websocket.accept()
     orchestrator: Orchestrator = websocket.app.state.orchestrator
     settings: Settings = websocket.app.state.settings
+    send_lock = asyncio.Lock()
 
     async def send(message: AnyServerMessage) -> None:
-        await websocket.send_text(message.model_dump_json())
+        # Tolérant : un tour peut encore émettre pendant une déconnexion.
+        if websocket.client_state is not WebSocketState.CONNECTED:
+            return
+        async with send_lock:
+            await websocket.send_text(message.model_dump_json())
 
     session = Session(send=send, conversation=Conversation(settings.system_prompt))
+    turn_task: asyncio.Task[None] | None = None
+
+    async def cancel_current_turn() -> None:
+        nonlocal turn_task
+        if turn_task is not None and not turn_task.done():
+            turn_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await turn_task
+            # Filet de sécurité : l'état repasse toujours à idle (no-op sinon).
+            await session.set_state(AppState.IDLE)
+        turn_task = None
+
+    async def run_turn(message: UserMessage | UserAudio) -> None:
+        try:
+            if isinstance(message, UserMessage):
+                await orchestrator.handle_user_message(session, message)
+            else:
+                await orchestrator.handle_user_audio(session, message)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("erreur pendant le traitement du message")
+            await send(
+                ErrorMessage(
+                    code="internal_error",
+                    message="Erreur interne pendant le traitement — voir les logs serveur.",
+                )
+            )
+            await session.set_state(AppState.IDLE)
 
     # État initial explicite, puis modèle détecté (ou erreur guidante si LM Studio
     # est éteint / vide) : le client sait immédiatement à quoi il parle.
@@ -48,19 +93,17 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 logger.warning("message client invalide : %s", exc.message)
                 await session.send(ErrorMessage(code=exc.code, message=exc.message))
                 continue
-            try:
-                if isinstance(message, UserMessage):
-                    await orchestrator.handle_user_message(session, message)
-                else:
-                    await orchestrator.handle_user_audio(session, message)
-            except Exception:
-                logger.exception("erreur pendant le traitement du message")
-                await session.send(
-                    ErrorMessage(
-                        code="internal_error",
-                        message="Erreur interne pendant le traitement — voir les logs serveur.",
-                    )
-                )
-                await session.set_state(AppState.IDLE)
+            if isinstance(message, Interrupt):
+                await cancel_current_turn()
+                continue
+            # Une nouvelle entrée remplace le tour en cours (le texte partiel
+            # est archivé tel quel par l'orchestrateur).
+            await cancel_current_turn()
+            turn_task = asyncio.create_task(run_turn(message))
     except WebSocketDisconnect:
         logger.info("client déconnecté")
+    finally:
+        if turn_task is not None and not turn_task.done():
+            turn_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await turn_task

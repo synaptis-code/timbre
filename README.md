@@ -65,7 +65,7 @@ Le protocole WebSocket (messages `user_message`, `ai_chunk`, `state_change`, `er
 | 2 | LLM : streaming LM Studio, modèle chargé auto-détecté | ✅ |
 | 3 | TTS : synthèse vocale streaming phrase par phrase (edge-tts) | ✅ |
 | 4 | ASR + VAD : micro mains-libres → Whisper GPU → boucle vocale complète | ✅ |
-| 5 | Anti-feedback + états mains-libres | ⏳ |
+| 5 | Interruption (Stop / nouvelle prise de parole), états fidèles, anti-larsen | ✅ |
 | 6 | Personas robustes (JSON validé, zéro fallback silencieux) | ⏳ |
 | 7 | Polish UI | ⏳ |
 | 8 | Vision (partage d'écran par tour) | ⏳ |

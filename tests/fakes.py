@@ -1,5 +1,6 @@
 """Doubles de test partagés."""
 
+import asyncio
 from collections.abc import AsyncIterator
 
 from timbre.plugins.base import ASRBackend, ASRError, LLMBackend, LLMError, TTSBackend, TTSError
@@ -15,11 +16,13 @@ class FakeLLM(LLMBackend):
         model: str = "fake-model",
         error: LLMError | None = None,
         fail_after: int | None = None,
+        delay: float = 0.0,
     ) -> None:
         self.tokens = tokens if tokens is not None else ["Bon", "jour", " !"]
         self.model = model
         self.error = error
         self.fail_after = fail_after
+        self.delay = delay
         self.received_messages: list[list[dict[str, object]]] = []
 
     async def active_model(self) -> str:
@@ -34,6 +37,8 @@ class FakeLLM(LLMBackend):
         for index, token in enumerate(self.tokens):
             if self.fail_after is not None and index >= self.fail_after:
                 raise LLMError("llm_unreachable", "connexion perdue (simulée)")
+            if self.delay:
+                await asyncio.sleep(self.delay)
             yield token
 
 

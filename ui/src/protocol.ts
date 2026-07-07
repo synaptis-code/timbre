@@ -14,13 +14,17 @@ export interface UserAudio {
   audio_b64: string;
   format: "wav";
 }
-export type ClientMessage = UserMessage | UserAudio;
+export interface Interrupt {
+  type: "interrupt";
+}
+export type ClientMessage = UserMessage | UserAudio | Interrupt;
 
 // Serveur → client
 export interface AiChunk {
   type: "ai_chunk";
   text: string;
   last: boolean;
+  interrupted: boolean;
 }
 export interface StateChange {
   type: "state_change";

@@ -193,6 +193,31 @@ body {
   cursor: default;
 }
 
+.action-stop {
+  padding: 0.65rem 0.9rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--error);
+  background: transparent;
+  color: var(--error);
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.action-stop:disabled {
+  opacity: 0.3;
+  border-color: var(--border);
+  color: var(--text-dim);
+  cursor: default;
+}
+
+.bubble--interrupted::after {
+  content: " — interrompu";
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: 0.8em;
+}
+
 .action-input {
   flex: 1;
   padding: 0.65rem 0.9rem;
