@@ -39,8 +39,32 @@ export default function App() {
     });
     screenRef.current = screen;
 
+    // L'indicateur « Parle » suit la lecture réelle, pas l'envoi des données.
+    const audioQueue = new AudioQueue((active) => setTtsPlaying(active));
+    audioRef.current = audioQueue;
+
+    // Barge-in : dès que l'utilisateur commence à parler, la voix de l'IA se
+    // met en pause ; faux départ (bruit) → elle reprend ; vraie phrase → la
+    // lecture est coupée et la prise de parole remplace le tour en cours.
+    let bargedIn = false;
     const mic = new MicController({
+      onSpeechStart: () => {
+        if (audioQueue.isActive) {
+          audioQueue.pause();
+          bargedIn = true;
+        }
+      },
+      onMisfire: () => {
+        if (bargedIn) {
+          audioQueue.resume();
+          bargedIn = false;
+        }
+      },
       onSpeech: (wavB64) => {
+        if (bargedIn) {
+          audioQueue.stop();
+          bargedIn = false;
+        }
         const image = screen.isOn ? screen.captureFrame() : null;
         socketRef.current?.send({
           type: "user_audio",
@@ -53,14 +77,6 @@ export default function App() {
       onError: (message) => append({ role: "error", text: message }),
     });
     micRef.current = mic;
-
-    // Anti-feedback : micro en pause pendant que l'IA parle (bug n°8), et
-    // l'indicateur « Parle » suit la lecture réelle, pas l'envoi des données.
-    const audioQueue = new AudioQueue((active) => {
-      mic.setTtsPlaying(active);
-      setTtsPlaying(active);
-    });
-    audioRef.current = audioQueue;
 
     const handleMessage = (message: ServerMessage) => {
       switch (message.type) {

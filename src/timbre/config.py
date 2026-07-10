@@ -27,7 +27,7 @@ class Settings(BaseSettings):
 
     # Personas (dossier de fichiers JSON validés — voir personas/)
     personas_dir: str = "personas"
-    persona: str = "lea"  # persona actif à la connexion
+    persona: str = "timbre"  # persona actif à la connexion
 
     # Prompt système de secours, utilisé si le persona par défaut est invalide
     # (avec une erreur explicite — jamais de bascule silencieuse).

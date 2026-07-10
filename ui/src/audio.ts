@@ -12,6 +12,19 @@ export class AudioQueue {
     this.onActiveChange = onActiveChange;
   }
 
+  get isActive(): boolean {
+    return this.current !== null;
+  }
+
+  /** Pause/reprise sans vider la file (barge-in : l'utilisateur commence à parler). */
+  pause(): void {
+    this.current?.pause();
+  }
+
+  resume(): void {
+    void this.current?.play().catch(() => undefined);
+  }
+
   enqueue(audioB64: string, mimeType = "audio/mpeg"): void {
     const bytes = Uint8Array.from(atob(audioB64), (char) => char.charCodeAt(0));
     const url = URL.createObjectURL(new Blob([bytes], { type: mimeType }));

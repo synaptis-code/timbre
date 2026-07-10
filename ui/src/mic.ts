@@ -7,6 +7,10 @@ const START_TIMEOUT_MS = 15000;
 export interface MicHandlers {
   /** Une prise de parole complète, encodée en WAV base64. */
   onSpeech: (wavB64: string) => void;
+  /** L'utilisateur commence à parler (sert au barge-in : couper la voix de l'IA). */
+  onSpeechStart?: () => void;
+  /** Fausse détection (bruit court) : annuler l'éventuel barge-in. */
+  onMisfire?: () => void;
   /** Micro réellement actif ou non (après permission navigateur). */
   onStatus: (on: boolean) => void;
   onError: (message: string) => void;
@@ -14,16 +18,15 @@ export interface MicHandlers {
 
 /** Micro mains-libres : VAD silero dans le navigateur (assets locaux, /vad/).
  *
- * Anti-feedback : `setTtsPlaying(true)` met le VAD en pause pendant que l'IA
- * parle, pour que le micro n'entende pas sa voix (bug n°8 du plan).
+ * Le VAD reste actif pendant que l'IA parle : c'est ce qui permet de lui
+ * couper la parole (barge-in). L'anti-larsen repose sur l'annulation d'écho
+ * du navigateur (echoCancellation) — l'IA ne s'entend pas elle-même.
  */
 export class MicController {
+  private readonly handlers: MicHandlers;
   private vad: MicVAD | null = null;
   private wantedOn = false;
-  private ttsPlaying = false;
   private starting = false;
-
-  private readonly handlers: MicHandlers;
 
   constructor(handlers: MicHandlers) {
     this.handlers = handlers;
@@ -47,8 +50,20 @@ export class MicController {
           model: "v5",
           baseAssetPath: "/vad/",
           onnxWASMBasePath: "/vad/",
+          // Annulation d'écho explicite : indispensable au barge-in (l'IA ne
+          // doit pas s'entendre elle-même via les enceintes).
+          getStream: () =>
+            navigator.mediaDevices.getUserMedia({
+              audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+            }),
+          onSpeechStart: () => {
+            if (this.wantedOn) this.handlers.onSpeechStart?.();
+          },
+          onVADMisfire: () => {
+            if (this.wantedOn) this.handlers.onMisfire?.();
+          },
           onSpeechEnd: (audio: Float32Array) => {
-            if (this.wantedOn && !this.ttsPlaying) {
+            if (this.wantedOn) {
               this.handlers.onSpeech(encodeWavBase64(audio, VAD_SAMPLE_RATE));
             }
           },
@@ -78,25 +93,13 @@ export class MicController {
         this.starting = false;
       }
     }
-    this.applyPauseState();
+    this.vad.start();
     this.handlers.onStatus(true);
-  }
-
-  /** Pause anti-feedback pendant la lecture TTS. */
-  setTtsPlaying(playing: boolean): void {
-    this.ttsPlaying = playing;
-    this.applyPauseState();
   }
 
   destroy(): void {
     this.wantedOn = false;
     this.vad?.destroy();
     this.vad = null;
-  }
-
-  private applyPauseState(): void {
-    if (this.vad === null) return;
-    if (this.wantedOn && !this.ttsPlaying) this.vad.start();
-    else this.vad.pause();
   }
 }
