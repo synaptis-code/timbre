@@ -13,6 +13,10 @@ Assistant vocal IA **100 % local** et open source : vous parlez, l'IA comprend, 
 
 ## Démarrage
 
+**Windows, en un double-clic** : lance [demarrer.bat](demarrer.bat) — il réveille le serveur LM Studio (via le CLI `lms` s'il est présent), installe les dépendances UI au premier lancement, ouvre le backend et l'interface dans deux fenêtres (logs visibles) puis le navigateur sur http://localhost:5173. Il ne reste qu'à charger un modèle dans LM Studio. Pour tout arrêter : fermer les deux fenêtres.
+
+Ou manuellement :
+
 ```powershell
 # Backend (terminal 1) — l'extra « asr » installe faster-whisper + les DLL CUDA
 uv sync --extra asr
