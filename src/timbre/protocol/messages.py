@@ -64,8 +64,17 @@ class ListPersonas(BaseModel):
     type: Literal["list_personas"] = "list_personas"
 
 
+class SetAsrDevice(BaseModel):
+    """Client → serveur : bascule Whisper CPU/GPU (rechargé au prochain tour vocal)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["set_asr_device"] = "set_asr_device"
+    device: Literal["cuda", "cpu"]
+
+
 ClientMessage = Annotated[
-    UserMessage | UserAudio | Interrupt | SetPersona | ListPersonas,
+    UserMessage | UserAudio | Interrupt | SetPersona | ListPersonas | SetAsrDevice,
     Field(discriminator="type"),
 ]
 
@@ -141,9 +150,40 @@ class PersonaList(BaseModel):
     active: str
 
 
+class AsrInfo(BaseModel):
+    """Serveur → client : périphérique d'inférence Whisper actuel."""
+
+    type: Literal["asr_info"] = "asr_info"
+    device: str
+
+
+class TurnMetrics(BaseModel):
+    """Serveur → client : mesures du tour écoulé (§14 du plan — budget < 3 s).
+
+    Durées en millisecondes depuis le début du traitement ; None = étape absente
+    (pas de voix, pas d'audio…). VRAM en Mo, None sans GPU NVIDIA.
+    """
+
+    type: Literal["turn_metrics"] = "turn_metrics"
+    asr_ms: int | None = None
+    first_token_ms: int | None = None
+    first_audio_ms: int | None = None
+    total_ms: int
+    vram_used_mb: int | None = None
+    vram_total_mb: int | None = None
+
+
 # Union nue pour typer les paramètres ; version annotée pour la (dé)sérialisation.
 AnyServerMessage = (
-    AiChunk | StateChange | ErrorMessage | ModelInfo | AiAudio | UserTranscript | PersonaList
+    AiChunk
+    | StateChange
+    | ErrorMessage
+    | ModelInfo
+    | AiAudio
+    | UserTranscript
+    | PersonaList
+    | AsrInfo
+    | TurnMetrics
 )
 ServerMessage = Annotated[AnyServerMessage, Field(discriminator="type")]
 

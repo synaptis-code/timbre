@@ -23,6 +23,7 @@ from timbre.protocol.messages import (
     Interrupt,
     ListPersonas,
     ProtocolError,
+    SetAsrDevice,
     SetPersona,
     StateChange,
     UserAudio,
@@ -44,11 +45,15 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     send_lock = asyncio.Lock()
 
     async def send(message: AnyServerMessage) -> None:
-        # Tolérant : un tour peut encore émettre pendant une déconnexion.
+        # Tolérant : un tour peut encore émettre pendant une déconnexion — y
+        # compris si elle survient ENTRE ce test et l'envoi (course observée).
         if websocket.client_state is not WebSocketState.CONNECTED:
             return
-        async with send_lock:
-            await websocket.send_text(message.model_dump_json())
+        try:
+            async with send_lock:
+                await websocket.send_text(message.model_dump_json())
+        except WebSocketDisconnect:
+            logger.debug("envoi ignoré : client déconnecté pendant l'écriture")
 
     session = Session(
         send=send,
@@ -93,6 +98,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     await session.send(StateChange(state=session.state))
     await orchestrator.announce_model(session)
     await orchestrator.init_persona(session)
+    await orchestrator.announce_asr(session)
 
     try:
         while True:
@@ -108,6 +114,9 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 continue
             if isinstance(message, ListPersonas):
                 await orchestrator.send_persona_list(session)
+                continue
+            if isinstance(message, SetAsrDevice):
+                await orchestrator.handle_set_asr_device(session, message)
                 continue
             # Une nouvelle entrée remplace le tour en cours (le texte partiel
             # est archivé tel quel par l'orchestrateur).

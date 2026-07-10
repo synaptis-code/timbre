@@ -5,8 +5,9 @@ import { ChatThread, type ChatMessage } from "./components/ChatThread";
 import { StateIndicator } from "./components/StateIndicator";
 import { MicController } from "./mic";
 import { ScreenShare } from "./screen";
+import { Diagnostic } from "./components/Diagnostic";
 import { PersonaSelect } from "./components/PersonaSelect";
-import type { AppState, PersonaSummary, ServerMessage } from "./protocol";
+import type { AppState, PersonaSummary, ServerMessage, TurnMetrics } from "./protocol";
 import { TimbreSocket, type ConnectionStatus } from "./ws";
 
 export default function App() {
@@ -18,6 +19,8 @@ export default function App() {
   const [ttsPlaying, setTtsPlaying] = useState(false);
   const [personas, setPersonas] = useState<PersonaSummary[]>([]);
   const [activePersona, setActivePersona] = useState("");
+  const [metrics, setMetrics] = useState<TurnMetrics | null>(null);
+  const [asrDevice, setAsrDevice] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const socketRef = useRef<TimbreSocket | null>(null);
   const micRef = useRef<MicController | null>(null);
@@ -70,6 +73,12 @@ export default function App() {
         case "persona_list":
           setPersonas(message.personas);
           setActivePersona(message.active);
+          break;
+        case "turn_metrics":
+          setMetrics(message);
+          break;
+        case "asr_info":
+          setAsrDevice(message.device);
           break;
         case "user_transcript":
           append({ role: "user", text: message.text });
@@ -165,6 +174,12 @@ export default function App() {
       </header>
       <StateIndicator state={displayState} />
       <ChatThread messages={messages} />
+      <Diagnostic
+        metrics={metrics}
+        asrDevice={asrDevice}
+        disabled={status !== "connected"}
+        onSetAsrDevice={(device) => socketRef.current?.send({ type: "set_asr_device", device })}
+      />
       <ActionBar
         disabled={status !== "connected"}
         micOn={micOn}

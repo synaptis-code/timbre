@@ -44,11 +44,12 @@ def connect(tmp_path: Path, llm: FakeLLM | None = None, tts: FakeTTS | None = No
 
 
 def receive_connect_sequence(ws) -> dict:
-    """state_change + model_info + persona_list ; renvoie la persona_list."""
+    """state_change + model_info + persona_list + asr_info ; renvoie la persona_list."""
     assert ws.receive_json()["type"] == "state_change"
     assert ws.receive_json()["type"] == "model_info"
     persona_list = ws.receive_json()
     assert persona_list["type"] == "persona_list"
+    assert ws.receive_json()["type"] == "asr_info"
     return persona_list
 
 

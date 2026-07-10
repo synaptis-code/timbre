@@ -29,7 +29,7 @@ def drain_until_idle(ws) -> list[dict]:
 def test_stop_interrupts_generation_and_archives_partial():
     llm = FakeLLM(tokens=SLOW_TOKENS, delay=0.05)
     with connect(llm) as ws:
-        ws.receive_json(), ws.receive_json(), ws.receive_json()
+        ws.receive_json(), ws.receive_json(), ws.receive_json(), ws.receive_json()
 
         ws.send_json({"type": "user_message", "text": "Compte jusqu'à trente"})
         while ws.receive_json()["type"] != "ai_chunk":
@@ -54,7 +54,7 @@ def test_stop_interrupts_generation_and_archives_partial():
 def test_new_message_supersedes_running_turn():
     llm = FakeLLM(tokens=SLOW_TOKENS, delay=0.05)
     with connect(llm) as ws:
-        ws.receive_json(), ws.receive_json(), ws.receive_json()
+        ws.receive_json(), ws.receive_json(), ws.receive_json(), ws.receive_json()
 
         ws.send_json({"type": "user_message", "text": "Première question"})
         while ws.receive_json()["type"] != "ai_chunk":
@@ -77,7 +77,7 @@ def test_new_message_supersedes_running_turn():
 def test_interrupt_when_idle_is_a_noop():
     llm = FakeLLM(tokens=["Ok."])
     with connect(llm) as ws:
-        ws.receive_json(), ws.receive_json(), ws.receive_json()
+        ws.receive_json(), ws.receive_json(), ws.receive_json(), ws.receive_json()
 
         ws.send_json({"type": "interrupt"})
         # Aucune erreur : le message suivant démarre un tour normalement.

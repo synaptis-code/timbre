@@ -27,7 +27,17 @@ export interface SetPersona {
 export interface ListPersonas {
   type: "list_personas";
 }
-export type ClientMessage = UserMessage | UserAudio | Interrupt | SetPersona | ListPersonas;
+export interface SetAsrDevice {
+  type: "set_asr_device";
+  device: "cuda" | "cpu";
+}
+export type ClientMessage =
+  | UserMessage
+  | UserAudio
+  | Interrupt
+  | SetPersona
+  | ListPersonas
+  | SetAsrDevice;
 
 // Serveur → client
 export interface AiChunk {
@@ -70,6 +80,19 @@ export interface PersonaList {
   personas: PersonaSummary[];
   active: string;
 }
+export interface AsrInfo {
+  type: "asr_info";
+  device: string;
+}
+export interface TurnMetrics {
+  type: "turn_metrics";
+  asr_ms: number | null;
+  first_token_ms: number | null;
+  first_audio_ms: number | null;
+  total_ms: number;
+  vram_used_mb: number | null;
+  vram_total_mb: number | null;
+}
 export type ServerMessage =
   | AiChunk
   | StateChange
@@ -77,7 +100,9 @@ export type ServerMessage =
   | ModelInfo
   | AiAudio
   | UserTranscript
-  | PersonaList;
+  | PersonaList
+  | AsrInfo
+  | TurnMetrics;
 
 const SERVER_MESSAGE_TYPES = new Set([
   "ai_chunk",
@@ -87,6 +112,8 @@ const SERVER_MESSAGE_TYPES = new Set([
   "ai_audio",
   "user_transcript",
   "persona_list",
+  "asr_info",
+  "turn_metrics",
 ]);
 
 export function parseServerMessage(raw: string): ServerMessage | null {

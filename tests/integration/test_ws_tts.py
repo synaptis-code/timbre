@@ -16,7 +16,7 @@ def run_turn(llm: FakeLLM, tts: FakeTTS, text: str = "Parle-moi") -> list[dict]:
     """Envoie un message et collecte tous les messages jusqu'au retour à idle."""
     client = TestClient(create_app(llm=llm, tts=tts))
     with client.websocket_connect("/ws") as ws:
-        ws.receive_json(), ws.receive_json(), ws.receive_json()
+        ws.receive_json(), ws.receive_json(), ws.receive_json(), ws.receive_json()
         ws.send_json({"type": "user_message", "text": text})
         received = []
         while (msg := ws.receive_json()) != {"type": "state_change", "state": "idle"}:

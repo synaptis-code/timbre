@@ -29,6 +29,31 @@
         "title": "ListPersonas",
         "type": "object"
       },
+      "SetAsrDevice": {
+        "additionalProperties": false,
+        "description": "Client → serveur : bascule Whisper CPU/GPU (rechargé au prochain tour vocal).",
+        "properties": {
+          "device": {
+            "enum": [
+              "cuda",
+              "cpu"
+            ],
+            "title": "Device",
+            "type": "string"
+          },
+          "type": {
+            "const": "set_asr_device",
+            "default": "set_asr_device",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device"
+        ],
+        "title": "SetAsrDevice",
+        "type": "object"
+      },
       "SetPersona": {
         "additionalProperties": false,
         "description": "Client → serveur : change de persona. Refusé avec raison si invalide (jamais en silence).",
@@ -134,6 +159,7 @@
       "mapping": {
         "interrupt": "#/$defs/Interrupt",
         "list_personas": "#/$defs/ListPersonas",
+        "set_asr_device": "#/$defs/SetAsrDevice",
         "set_persona": "#/$defs/SetPersona",
         "user_audio": "#/$defs/UserAudio",
         "user_message": "#/$defs/UserMessage"
@@ -155,6 +181,9 @@
       },
       {
         "$ref": "#/$defs/ListPersonas"
+      },
+      {
+        "$ref": "#/$defs/SetAsrDevice"
       }
     ]
   },
@@ -230,6 +259,26 @@
         ],
         "title": "AppState",
         "type": "string"
+      },
+      "AsrInfo": {
+        "description": "Serveur → client : périphérique d'inférence Whisper actuel.",
+        "properties": {
+          "device": {
+            "title": "Device",
+            "type": "string"
+          },
+          "type": {
+            "const": "asr_info",
+            "default": "asr_info",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device"
+        ],
+        "title": "AsrInfo",
+        "type": "object"
       },
       "ErrorMessage": {
         "description": "Serveur → client : erreur toujours visible, jamais avalée.",
@@ -359,6 +408,86 @@
         "title": "StateChange",
         "type": "object"
       },
+      "TurnMetrics": {
+        "description": "Serveur → client : mesures du tour écoulé (§14 du plan — budget < 3 s).\n\nDurées en millisecondes depuis le début du traitement ; None = étape absente\n(pas de voix, pas d'audio…). VRAM en Mo, None sans GPU NVIDIA.",
+        "properties": {
+          "asr_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Asr Ms"
+          },
+          "first_audio_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First Audio Ms"
+          },
+          "first_token_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First Token Ms"
+          },
+          "total_ms": {
+            "title": "Total Ms",
+            "type": "integer"
+          },
+          "type": {
+            "const": "turn_metrics",
+            "default": "turn_metrics",
+            "title": "Type",
+            "type": "string"
+          },
+          "vram_total_mb": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Vram Total Mb"
+          },
+          "vram_used_mb": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Vram Used Mb"
+          }
+        },
+        "required": [
+          "total_ms"
+        ],
+        "title": "TurnMetrics",
+        "type": "object"
+      },
       "UserTranscript": {
         "description": "Serveur → client : ce que l'ASR a compris (affiché comme bulle utilisateur).",
         "properties": {
@@ -384,10 +513,12 @@
       "mapping": {
         "ai_audio": "#/$defs/AiAudio",
         "ai_chunk": "#/$defs/AiChunk",
+        "asr_info": "#/$defs/AsrInfo",
         "error": "#/$defs/ErrorMessage",
         "model_info": "#/$defs/ModelInfo",
         "persona_list": "#/$defs/PersonaList",
         "state_change": "#/$defs/StateChange",
+        "turn_metrics": "#/$defs/TurnMetrics",
         "user_transcript": "#/$defs/UserTranscript"
       },
       "propertyName": "type"
@@ -413,6 +544,12 @@
       },
       {
         "$ref": "#/$defs/PersonaList"
+      },
+      {
+        "$ref": "#/$defs/AsrInfo"
+      },
+      {
+        "$ref": "#/$defs/TurnMetrics"
       }
     ]
   },

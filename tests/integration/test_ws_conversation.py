@@ -28,10 +28,11 @@ def test_health():
 
 def test_conversation_flow():
     with connect(FakeLLM(tokens=["Bon", "jour", " !"])) as ws:
-        # À la connexion : état initial + modèle détecté + liste des personas.
+        # À la connexion : état initial + modèle + personas + device ASR.
         assert ws.receive_json() == {"type": "state_change", "state": "idle"}
         assert ws.receive_json() == {"type": "model_info", "model": "fake-model"}
         assert ws.receive_json()["type"] == "persona_list"
+        assert ws.receive_json()["type"] == "asr_info"
 
         ws.send_json({"type": "user_message", "text": "Salut !"})
 
@@ -42,13 +43,18 @@ def test_conversation_flow():
         assert ws.receive_json() == {**chunk, "text": "jour"}
         assert ws.receive_json() == {**chunk, "text": " !"}
         assert ws.receive_json() == {**chunk, "text": "", "last": True}
+        metrics = ws.receive_json()
+        assert metrics["type"] == "turn_metrics"
+        assert isinstance(metrics["total_ms"], int)
+        assert isinstance(metrics["first_token_ms"], int)
+        assert metrics["asr_ms"] is None  # tour clavier
         assert ws.receive_json() == {"type": "state_change", "state": "idle"}
 
 
 def test_history_sent_to_llm_includes_system_prompt_and_turns():
     llm = FakeLLM(tokens=["Ça", " va"])
     with connect(llm) as ws:
-        ws.receive_json(), ws.receive_json(), ws.receive_json()
+        ws.receive_json(), ws.receive_json(), ws.receive_json(), ws.receive_json()
 
         ws.send_json({"type": "user_message", "text": "Comment ça va ?"})
         while ws.receive_json() != {"type": "state_change", "state": "idle"}:
@@ -73,6 +79,7 @@ def test_llm_unreachable_yields_explicit_error():
         assert first["type"] == "error"
         assert first["code"] == "llm_unreachable"
         assert ws.receive_json()["type"] == "persona_list"
+        assert ws.receive_json()["type"] == "asr_info"
 
         ws.send_json({"type": "user_message", "text": "Allô ?"})
         assert ws.receive_json() == {"type": "state_change", "state": "thinking"}
@@ -83,7 +90,7 @@ def test_llm_unreachable_yields_explicit_error():
 def test_stream_failure_archives_partial_text():
     llm = FakeLLM(tokens=["Il", " était", " une fois"], fail_after=2)
     with connect(llm) as ws:
-        ws.receive_json(), ws.receive_json(), ws.receive_json()
+        ws.receive_json(), ws.receive_json(), ws.receive_json(), ws.receive_json()
 
         ws.send_json({"type": "user_message", "text": "Raconte une histoire"})
         received = []
@@ -105,7 +112,7 @@ def test_stream_failure_archives_partial_text():
 
 def test_invalid_message_yields_error_and_keeps_connection():
     with connect(FakeLLM()) as ws:
-        ws.receive_json(), ws.receive_json(), ws.receive_json()
+        ws.receive_json(), ws.receive_json(), ws.receive_json(), ws.receive_json()
 
         ws.send_text("n'importe quoi")
         error = ws.receive_json()

@@ -29,7 +29,7 @@ def drain_until_idle(ws) -> list[dict]:
 def test_image_reaches_llm_in_openai_multimodal_format():
     llm = FakeLLM(tokens=["Je", " vois."])
     with connect(llm) as ws:
-        ws.receive_json(), ws.receive_json(), ws.receive_json()
+        ws.receive_json(), ws.receive_json(), ws.receive_json(), ws.receive_json()
         ws.send_json({"type": "user_message", "text": "Que vois-tu ?", "image": IMAGE})
         drain_until_idle(ws)
 
@@ -43,7 +43,7 @@ def test_image_reaches_llm_in_openai_multimodal_format():
 def test_only_latest_image_kept_in_history():
     llm = FakeLLM(tokens=["Vu."])
     with connect(llm) as ws:
-        ws.receive_json(), ws.receive_json(), ws.receive_json()
+        ws.receive_json(), ws.receive_json(), ws.receive_json(), ws.receive_json()
         ws.send_json({"type": "user_message", "text": "Écran un", "image": IMAGE})
         drain_until_idle(ws)
         ws.send_json({"type": "user_message", "text": "Écran deux", "image": IMAGE})
@@ -59,7 +59,7 @@ def test_only_latest_image_kept_in_history():
 def test_model_without_vision_says_so_and_answers_text_only():
     llm = FakeLLM(tokens=["Réponse", " texte."], vision=False)
     with connect(llm) as ws:
-        ws.receive_json(), ws.receive_json(), ws.receive_json()
+        ws.receive_json(), ws.receive_json(), ws.receive_json(), ws.receive_json()
         ws.send_json({"type": "user_message", "text": "Regarde ça", "image": IMAGE})
         received = drain_until_idle(ws)
 
@@ -74,7 +74,7 @@ def test_model_without_vision_says_so_and_answers_text_only():
 
 def test_invalid_image_payload_is_rejected():
     with connect(FakeLLM()) as ws:
-        ws.receive_json(), ws.receive_json(), ws.receive_json()
+        ws.receive_json(), ws.receive_json(), ws.receive_json(), ws.receive_json()
         ws.send_json({"type": "user_message", "text": "hop", "image": "http://exemple.com/a.png"})
         error = ws.receive_json()
         assert error["type"] == "error"

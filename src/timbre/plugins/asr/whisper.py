@@ -34,6 +34,21 @@ class FasterWhisperASR(ASRBackend):
         self._model: WhisperModel | None = None
         self._load_lock = asyncio.Lock()
 
+    @property
+    def device(self) -> str:
+        return self._device
+
+    def set_device(self, device: str) -> None:
+        """Bascule CPU/GPU en un clic : le modèle est rechargé au prochain usage."""
+        if device == self._device:
+            return
+        logger.info(
+            "device Whisper : %s → %s (rechargement au prochain tour)", self._device, device
+        )
+        self._device = device
+        self._compute_type = "float16" if device == "cuda" else "int8"
+        self._model = None
+
     async def transcribe(self, audio: bytes) -> str:
         model = await self._ensure_model()
         try:

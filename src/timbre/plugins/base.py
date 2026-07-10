@@ -65,6 +65,18 @@ class ASRBackend(ABC):
     async def transcribe(self, audio: bytes) -> str:
         """Transcrit un enregistrement (WAV/MP3…). Lève `ASRError` en cas de problème."""
 
+    @property
+    def device(self) -> str | None:
+        """Périphérique d'inférence ("cuda"/"cpu"), None si sans objet."""
+        return None
+
+    def set_device(self, device: str) -> None:
+        """Bascule CPU/GPU. Lève `ASRError` si le moteur ne le permet pas."""
+        raise ASRError(
+            "asr_device_unsupported",
+            "Ce moteur ASR ne permet pas de changer de périphérique.",
+        )
+
 
 class TTSError(Exception):
     """Erreur TTS destinée à l'utilisateur : code stable + message clair."""

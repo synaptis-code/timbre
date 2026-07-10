@@ -279,6 +279,49 @@ body {
   font-size: 0.8em;
 }
 
+/* — Diagnostic (repliable) — */
+.diag {
+  border-top: 1px solid var(--border);
+  padding: 0.35rem 0;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.diag-summary {
+  cursor: pointer;
+  user-select: none;
+  width: fit-content;
+}
+
+.diag-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.1rem;
+  align-items: center;
+  padding: 0.4rem 0 0.15rem;
+}
+
+.diag-body strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.diag-device {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.diag-device select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  padding: 0.15rem 0.35rem;
+  font: inherit;
+}
+
 /* — Barre d'action — */
 .action-bar {
   display: flex;

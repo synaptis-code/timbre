@@ -10,8 +10,11 @@ import asyncio
 import binascii
 import contextlib
 import logging
+import time
 from base64 import b64decode, b64encode
+from dataclasses import dataclass
 
+from timbre.core.gpu import vram_snapshot
 from timbre.core.segmenter import SentenceSplitter
 from timbre.core.session import Session
 from timbre.core.tts_text import clean_for_tts, is_speakable
@@ -21,11 +24,14 @@ from timbre.plugins.base import ASRBackend, ASRError, LLMBackend, LLMError, TTSB
 from timbre.protocol.messages import (
     AiAudio,
     AiChunk,
+    AsrInfo,
     ErrorMessage,
     ModelInfo,
     PersonaList,
     PersonaSummary,
+    SetAsrDevice,
     SetPersona,
+    TurnMetrics,
     UserAudio,
     UserMessage,
     UserTranscript,
@@ -33,6 +39,18 @@ from timbre.protocol.messages import (
 from timbre.protocol.states import AppState
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _TurnTimer:
+    """Chronomètre d'un tour, pour les métriques de latence (§14)."""
+
+    started: float
+    first_token_ms: int | None = None
+    first_audio_ms: int | None = None
+
+    def elapsed_ms(self) -> int:
+        return round((time.perf_counter() - self.started) * 1000)
 
 
 class Orchestrator:
@@ -108,6 +126,28 @@ class Orchestrator:
     def _engine_for(self, session: Session) -> TTSBackend | None:
         return self._tts_engines.get(session.persona.voice.engine)
 
+    # ── ASR (device) ────────────────────────────────────────────────────────
+
+    async def announce_asr(self, session: Session) -> None:
+        if self._asr is not None and self._asr.device is not None:
+            await session.send(AsrInfo(device=self._asr.device))
+
+    async def handle_set_asr_device(self, session: Session, message: SetAsrDevice) -> None:
+        if self._asr is None:
+            await session.send(
+                ErrorMessage(
+                    code="asr_unavailable",
+                    message="La transcription vocale est désactivée (TIMBRE_ASR_ENABLED=0).",
+                )
+            )
+            return
+        try:
+            self._asr.set_device(message.device)
+        except ASRError as exc:
+            await session.send(ErrorMessage(code=exc.code, message=exc.message))
+            return
+        await session.send(AsrInfo(device=message.device))
+
     # ── Modèle ──────────────────────────────────────────────────────────────
 
     async def announce_model(self, session: Session) -> None:
@@ -141,12 +181,14 @@ class Orchestrator:
             )
             await session.set_state(AppState.IDLE)
             return
+        asr_started = time.perf_counter()
         try:
             transcript = await self._asr.transcribe(audio)
         except ASRError as exc:
             await session.send(ErrorMessage(code=exc.code, message=exc.message))
             await session.set_state(AppState.IDLE)
             return
+        asr_ms = round((time.perf_counter() - asr_started) * 1000)
         if not transcript:
             await session.send(
                 ErrorMessage(
@@ -157,10 +199,14 @@ class Orchestrator:
             await session.set_state(AppState.IDLE)
             return
         await session.send(UserTranscript(text=transcript))
-        await self._generate_reply(session, transcript, image=message.image)
+        await self._generate_reply(session, transcript, image=message.image, asr_ms=asr_ms)
 
     async def _generate_reply(
-        self, session: Session, user_text: str, image: str | None = None
+        self,
+        session: Session,
+        user_text: str,
+        image: str | None = None,
+        asr_ms: int | None = None,
     ) -> None:
         conversation = session.conversation
         await session.set_state(AppState.THINKING)
@@ -191,11 +237,12 @@ class Orchestrator:
             image = None
         conversation.add_user(user_text, image=image)
 
+        timer = _TurnTimer(started=time.perf_counter())
         splitter = SentenceSplitter()
         sentences: asyncio.Queue[str | None] = asyncio.Queue()
         speaker: asyncio.Task[None] | None = None
         if self._engine_for(session) is not None:
-            speaker = asyncio.create_task(self._speak_sentences(session, sentences))
+            speaker = asyncio.create_task(self._speak_sentences(session, sentences, timer))
 
         emitted: list[str] = []
         interrupted = False
@@ -205,6 +252,8 @@ class Orchestrator:
                     conversation.to_messages(), temperature=session.persona.temperature
                 )
                 async for token in stream:
+                    if timer.first_token_ms is None:
+                        timer.first_token_ms = timer.elapsed_ms()
                     emitted.append(token)
                     await session.send(AiChunk(text=token))
                     for sentence in splitter.feed(token):
@@ -242,12 +291,23 @@ class Orchestrator:
             # Seul le texte réellement émis entre dans l'historique (bug n°3) —
             # un tour interrompu est archivé tel quel, jamais inventé.
             conversation.add_assistant("".join(emitted))
+            vram = await vram_snapshot()
+            await session.send(
+                TurnMetrics(
+                    asr_ms=asr_ms,
+                    first_token_ms=timer.first_token_ms,
+                    first_audio_ms=timer.first_audio_ms,
+                    total_ms=timer.elapsed_ms(),
+                    vram_used_mb=vram[0] if vram is not None else None,
+                    vram_total_mb=vram[1] if vram is not None else None,
+                )
+            )
             await session.set_state(AppState.IDLE)
 
     # ── Voix ────────────────────────────────────────────────────────────────
 
     async def _speak_sentences(
-        self, session: Session, sentences: asyncio.Queue[str | None]
+        self, session: Session, sentences: asyncio.Queue[str | None], timer: _TurnTimer
     ) -> None:
         """Synthétise chaque phrase dès qu'elle est close, pendant que le LLM continue.
 
@@ -262,6 +322,8 @@ class Orchestrator:
             if audio is None:
                 failed = True
             elif audio:
+                if timer.first_audio_ms is None:
+                    timer.first_audio_ms = timer.elapsed_ms()
                 await session.set_state(AppState.SPEAKING)
                 await session.send(
                     AiAudio(
