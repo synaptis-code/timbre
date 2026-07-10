@@ -1,16 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api, type ConversationMeta } from "./api";
 import { AudioQueue } from "./audio";
-import { ActionBar } from "./components/ActionBar";
 import { ChatThread, type ChatMessage } from "./components/ChatThread";
+import { Composer } from "./components/Composer";
+import { PersonaSelect } from "./components/PersonaSelect";
+import { SettingsView } from "./components/SettingsView";
+import { Sidebar } from "./components/Sidebar";
 import { StateIndicator } from "./components/StateIndicator";
 import { MicController } from "./mic";
-import { ScreenShare } from "./screen";
-import { Diagnostic } from "./components/Diagnostic";
-import { PersonaSelect } from "./components/PersonaSelect";
 import type { AppState, PersonaSummary, ServerMessage, TurnMetrics } from "./protocol";
-import { TimbreSocket, type ConnectionStatus } from "./ws";
+import { ScreenShare } from "./screen";
+import { TimbreSocket, WS_BASE, type ConnectionStatus } from "./ws";
 
 export default function App() {
+  const [view, setView] = useState<"chat" | "settings">("chat");
+  const [conversations, setConversations] = useState<ConversationMeta[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [filter, setFilter] = useState("");
+
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [appState, setAppState] = useState<AppState>("idle");
   const [modelName, setModelName] = useState<string | null>(null);
@@ -21,17 +28,28 @@ export default function App() {
   const [activePersona, setActivePersona] = useState("");
   const [metrics, setMetrics] = useState<TurnMetrics | null>(null);
   const [asrDevice, setAsrDevice] = useState<string | null>(null);
+  const [language, setLanguage] = useState("fr");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+
   const socketRef = useRef<TimbreSocket | null>(null);
   const micRef = useRef<MicController | null>(null);
   const screenRef = useRef<ScreenShare | null>(null);
   const audioRef = useRef<AudioQueue | null>(null);
   const nextId = useRef(0);
+  const bootstrapped = useRef(false);
 
+  const append = useCallback((message: Omit<ChatMessage, "id">) => {
+    setMessages((prev) => [...prev, { ...message, id: nextId.current++ }]);
+  }, []);
+
+  const refreshConversations = useCallback(async () => {
+    setConversations(await api.listConversations());
+  }, []);
+
+  // ── Périphériques (créés une seule fois) ─────────────────────────────────
   useEffect(() => {
-    const append = (message: Omit<ChatMessage, "id">) => {
-      setMessages((prev) => [...prev, { ...message, id: nextId.current++ }]);
-    };
+    const audioQueue = new AudioQueue((active) => setTtsPlaying(active));
+    audioRef.current = audioQueue;
 
     const screen = new ScreenShare({
       onStatus: setScreenOn,
@@ -39,13 +57,8 @@ export default function App() {
     });
     screenRef.current = screen;
 
-    // L'indicateur « Parle » suit la lecture réelle, pas l'envoi des données.
-    const audioQueue = new AudioQueue((active) => setTtsPlaying(active));
-    audioRef.current = audioQueue;
-
-    // Barge-in : dès que l'utilisateur commence à parler, la voix de l'IA se
-    // met en pause ; faux départ (bruit) → elle reprend ; vraie phrase → la
-    // lecture est coupée et la prise de parole remplace le tour en cours.
+    // Barge-in : début de parole → pause de la voix ; faux départ → reprise ;
+    // vraie phrase → lecture coupée, la prise de parole remplace le tour.
     let bargedIn = false;
     const mic = new MicController({
       onSpeechStart: () => {
@@ -78,10 +91,59 @@ export default function App() {
     });
     micRef.current = mic;
 
+    return () => {
+      mic.destroy();
+      screen.stop();
+      audioQueue.stop();
+    };
+  }, [append]);
+
+  // ── Amorçage : conversations + réglages ─────────────────────────────────
+  useEffect(() => {
+    // Garde StrictMode : l'effet ne doit créer la conversation qu'une fois.
+    if (bootstrapped.current) return;
+    bootstrapped.current = true;
+    void (async () => {
+      try {
+        let list = await api.listConversations();
+        if (list.length === 0) list = [await api.createConversation()];
+        setConversations(list);
+        setActiveId((prev) => prev ?? list[0].id);
+        setLanguage((await api.getSettings()).language);
+      } catch (error) {
+        append({
+          role: "error",
+          text: `Backend injoignable : ${error instanceof Error ? error.message : String(error)}`,
+        });
+      }
+    })();
+  }, [append]);
+
+  // ── Socket par conversation active ──────────────────────────────────────
+  useEffect(() => {
+    if (activeId === null) return;
+    let cancelled = false;
+    setMessages([]);
+    void api
+      .listMessages(activeId)
+      .then((stored) => {
+        if (cancelled) return;
+        setMessages(
+          stored.map((message) => ({
+            id: nextId.current++,
+            role: message.role === "user" ? ("user" as const) : ("ai" as const),
+            text: message.content,
+            interrupted: message.interrupted || undefined,
+          })),
+        );
+      })
+      .catch(() => undefined);
+
     const handleMessage = (message: ServerMessage) => {
       switch (message.type) {
         case "state_change":
           setAppState(message.state);
+          if (message.state === "idle") void refreshConversations().catch(() => undefined);
           break;
         case "model_info":
           setModelName(message.model);
@@ -100,7 +162,7 @@ export default function App() {
           append({ role: "user", text: message.text });
           break;
         case "ai_audio":
-          audioQueue.enqueue(message.audio_b64);
+          audioRef.current?.enqueue(message.audio_b64);
           break;
         case "ai_chunk":
           setMessages((prev) => {
@@ -127,16 +189,19 @@ export default function App() {
       }
     };
 
-    const socket = new TimbreSocket({ onMessage: handleMessage, onStatus: setStatus });
+    const socket = new TimbreSocket(
+      { onMessage: handleMessage, onStatus: setStatus },
+      `${WS_BASE}?conversation=${activeId}`,
+    );
     socketRef.current = socket;
     return () => {
+      cancelled = true;
       socket.dispose();
-      audioQueue.stop();
-      mic.destroy();
-      screen.stop();
+      audioRef.current?.stop();
     };
-  }, []);
+  }, [activeId, append, refreshConversations]);
 
+  // ── Actions ──────────────────────────────────────────────────────────────
   const sendUserMessage = (text: string) => {
     const screen = screenRef.current;
     const image = screen !== null && screen.isOn ? screen.captureFrame() : null;
@@ -159,6 +224,49 @@ export default function App() {
     socketRef.current?.send({ type: "interrupt" });
   };
 
+  const newConversation = () => {
+    void api
+      .createConversation()
+      .then((meta) => {
+        setConversations((prev) => [meta, ...prev]);
+        setActiveId(meta.id);
+        setView("chat");
+      })
+      .catch((error: unknown) => append({ role: "error", text: String(error) }));
+  };
+
+  const deleteConversation = (id: string) => {
+    const target = conversations.find((c) => c.id === id);
+    if (!window.confirm(`Supprimer « ${target?.title ?? "cette conversation"} » ?`)) return;
+    void api
+      .deleteConversation(id)
+      .then(async () => {
+        let list = await api.listConversations();
+        if (list.length === 0) list = [await api.createConversation()];
+        setConversations(list);
+        if (id === activeId) setActiveId(list[0].id);
+      })
+      .catch((error: unknown) => append({ role: "error", text: String(error) }));
+  };
+
+  const renameActive = () => {
+    const current = conversations.find((c) => c.id === activeId);
+    if (current === undefined || activeId === null) return;
+    const title = window.prompt("Titre de la conversation :", current.title);
+    if (title === null || title.trim() === "") return;
+    void api
+      .renameConversation(activeId, title.trim())
+      .then(() => refreshConversations())
+      .catch((error: unknown) => append({ role: "error", text: String(error) }));
+  };
+
+  const changeLanguage = (value: string) => {
+    setLanguage(value);
+    void api.putSettings(value).catch((error: unknown) =>
+      append({ role: "error", text: String(error) }),
+    );
+  };
+
   // État affiché : « Parle » suit la lecture audio réelle côté client ;
   // « En écoute » = micro ouvert et rien en cours.
   const displayState: AppState = ttsPlaying
@@ -167,45 +275,75 @@ export default function App() {
       ? "listening"
       : appState;
   const canStop = ttsPlaying || appState === "thinking" || appState === "speaking";
+  const activeTitle = conversations.find((c) => c.id === activeId)?.title ?? "";
+  const personaName = personas.find((p) => p.id === activePersona)?.name ?? "Timbre";
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1 className="app-title">Timbre</h1>
-        {modelName !== null && <span className="model-badge">{modelName}</span>}
-        <PersonaSelect
-          personas={personas}
-          active={activePersona}
+    <div className="shell">
+      <Sidebar
+        conversations={conversations}
+        activeId={activeId}
+        filter={filter}
+        status={status}
+        onFilterChange={setFilter}
+        onSelect={(id) => {
+          setActiveId(id);
+          setView("chat");
+        }}
+        onNew={newConversation}
+        onDelete={deleteConversation}
+        onOpenSettings={() => setView("settings")}
+      />
+
+      {view === "settings" ? (
+        <SettingsView
+          language={language}
+          metrics={metrics}
+          asrDevice={asrDevice}
+          activePersona={personaName}
           disabled={status !== "connected"}
-          onSelect={(id) => socketRef.current?.send({ type: "set_persona", persona_id: id })}
-          onRefresh={() => socketRef.current?.send({ type: "list_personas" })}
+          onLanguageChange={changeLanguage}
+          onSetAsrDevice={(device) => socketRef.current?.send({ type: "set_asr_device", device })}
+          onBack={() => setView("chat")}
         />
-        <span className={`connection connection--${status}`}>
-          {status === "connected"
-            ? "Connecté"
-            : status === "connecting"
-              ? "Connexion…"
-              : "Déconnecté — reconnexion…"}
-        </span>
-      </header>
-      <StateIndicator state={displayState} />
-      <ChatThread messages={messages} />
-      <Diagnostic
-        metrics={metrics}
-        asrDevice={asrDevice}
-        disabled={status !== "connected"}
-        onSetAsrDevice={(device) => socketRef.current?.send({ type: "set_asr_device", device })}
-      />
-      <ActionBar
-        disabled={status !== "connected"}
-        micOn={micOn}
-        screenOn={screenOn}
-        canStop={canStop}
-        onToggleMic={() => void micRef.current?.toggle()}
-        onToggleScreen={() => void screenRef.current?.toggle()}
-        onStop={stopTurn}
-        onSend={sendUserMessage}
-      />
+      ) : (
+        <div className="chat">
+          <header className="topbar">
+            <button
+              type="button"
+              className="topbar-title"
+              onClick={renameActive}
+              title="Renommer la conversation"
+            >
+              {activeTitle}
+            </button>
+            <StateIndicator state={displayState} />
+            <div className="topbar-right">
+              <PersonaSelect
+                personas={personas}
+                active={activePersona}
+                disabled={status !== "connected"}
+                onSelect={(id) => socketRef.current?.send({ type: "set_persona", persona_id: id })}
+                onRefresh={() => socketRef.current?.send({ type: "list_personas" })}
+              />
+              {modelName !== null && <span className="model-badge">{modelName}</span>}
+            </div>
+          </header>
+          <ChatThread messages={messages} persona={personaName} />
+          <div className="composer-zone">
+            <Composer
+              disabled={status !== "connected"}
+              micOn={micOn}
+              screenOn={screenOn}
+              canStop={canStop}
+              onToggleMic={() => void micRef.current?.toggle()}
+              onToggleScreen={() => void screenRef.current?.toggle()}
+              onStop={stopTurn}
+              onSend={sendUserMessage}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

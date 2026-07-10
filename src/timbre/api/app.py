@@ -5,8 +5,10 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from timbre import __version__
+from timbre.api.rest import router as rest_router
 from timbre.api.ws import router as ws_router
 from timbre.config import Settings
 from timbre.core.orchestrator import Orchestrator
@@ -16,6 +18,7 @@ from timbre.plugins.asr.whisper import FasterWhisperASR
 from timbre.plugins.base import ASRBackend, LLMBackend, TTSBackend
 from timbre.plugins.llm.lmstudio import LMStudioBackend
 from timbre.plugins.tts.edge import EdgeTTSBackend
+from timbre.storage import Storage
 
 
 def create_app(
@@ -68,13 +71,25 @@ def create_app(
         voice=VoiceConfig(voice_id=app_settings.tts_voice),
     )
 
+    storage = Storage(Path(app_settings.database_path))
+
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        await storage.connect()
         yield
+        await storage.aclose()
         await llm_backend.aclose()
 
     app = FastAPI(title="Timbre", version=__version__, lifespan=lifespan)
+    # L'UI de dev (Vite) tourne sur un autre port : autoriser les appels REST locaux.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.state.settings = app_settings
+    app.state.storage = storage
     app.state.orchestrator = Orchestrator(
         llm=llm_backend,
         tts_engines=tts_engines,
@@ -84,6 +99,7 @@ def create_app(
         fallback_persona=fallback_persona,
     )
     app.include_router(ws_router)
+    app.include_router(rest_router)
 
     @app.get("/health")
     def health() -> dict[str, str]:

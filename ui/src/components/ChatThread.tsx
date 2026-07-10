@@ -14,7 +14,7 @@ export interface ChatMessage {
 
 const NEAR_BOTTOM_PX = 160;
 
-export function ChatThread({ messages }: { messages: ChatMessage[] }) {
+export function ChatThread({ messages, persona }: { messages: ChatMessage[]; persona: string }) {
   const containerRef = useRef<HTMLElement>(null);
 
   // Suit le flux seulement si l'utilisateur est déjà en bas : on ne lui
@@ -30,28 +30,42 @@ export function ChatThread({ messages }: { messages: ChatMessage[] }) {
 
   return (
     <main className="thread" ref={containerRef}>
-      {messages.length === 0 ? (
-        <p className="thread-empty">
-          Active le micro et parle, ou écris un message pour commencer.
-        </p>
-      ) : (
-        messages.map((message) => (
-          <div
-            key={message.id}
-            className={[
-              "bubble",
-              `bubble--${message.role}`,
-              message.streaming ? "bubble--streaming" : "",
-              message.interrupted ? "bubble--interrupted" : "",
-              message.withImage ? "bubble--with-image" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            {message.text}
+      <div className="thread-inner">
+        {messages.length === 0 ? (
+          <div className="thread-empty">
+            <h2 className="thread-empty-title">Comment puis-je t'aider&nbsp;?</h2>
+            <p className="thread-empty-hint">
+              Active le micro et parle, partage ton écran, ou écris un message.
+            </p>
           </div>
-        ))
-      )}
+        ) : (
+          messages.map((message) =>
+            message.role === "error" ? (
+              <p key={message.id} className="msg-error">
+                {message.text}
+              </p>
+            ) : message.role === "user" ? (
+              <div
+                key={message.id}
+                className={`msg-user ${message.withImage ? "msg-user--image" : ""}`}
+              >
+                {message.text}
+              </div>
+            ) : (
+              <div key={message.id} className="msg-ai">
+                <p className="eyebrow msg-ai-label">{persona}</p>
+                <div
+                  className={`msg-ai-text ${message.streaming ? "msg--streaming" : ""} ${
+                    message.interrupted ? "msg--interrupted" : ""
+                  }`}
+                >
+                  {message.text}
+                </div>
+              </div>
+            ),
+          )
+        )}
+      </div>
     </main>
   );
 }

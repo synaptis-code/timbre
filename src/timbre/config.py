@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     port: int = 8765
     log_level: str = "INFO"
 
+    # Persistance locale (conversations, messages, réglages)
+    database_path: str = "timbre.db"
+
     # LLM (LM Studio ou tout serveur OpenAI-compatible local)
     lmstudio_base_url: str = "http://127.0.0.1:1234"
     # None = auto-détection du modèle chargé dans LM Studio (recommandé).

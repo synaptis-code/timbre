@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
+import { MicIcon, ScreenIcon, SendIcon, StopIcon } from "../icons";
 
-interface ActionBarProps {
+interface ComposerProps {
   disabled: boolean;
   micOn: boolean;
   screenOn: boolean;
@@ -11,7 +12,7 @@ interface ActionBarProps {
   onSend: (text: string) => void;
 }
 
-export function ActionBar({
+export function Composer({
   disabled,
   micOn,
   screenOn,
@@ -20,7 +21,7 @@ export function ActionBar({
   onToggleScreen,
   onStop,
   onSend,
-}: ActionBarProps) {
+}: ComposerProps) {
   const [draft, setDraft] = useState("");
 
   const submit = (event: FormEvent) => {
@@ -32,50 +33,51 @@ export function ActionBar({
   };
 
   return (
-    <form className="action-bar" onSubmit={submit}>
+    <form className="composer" onSubmit={submit}>
       <button
         type="button"
-        className={`action-mic ${micOn ? "action-mic--on" : ""}`}
+        className={`icon-btn ${micOn ? "icon-btn--active" : ""}`}
         onClick={onToggleMic}
         disabled={disabled}
         aria-pressed={micOn}
-        title={micOn ? "Couper le micro" : "Activer le micro (mains-libres)"}
+        title={micOn ? "Couper le micro" : "Micro mains-libres"}
       >
-        {micOn ? "Micro ●" : "Micro ○"}
+        <MicIcon />
       </button>
       <button
         type="button"
-        className={`action-mic ${screenOn ? "action-mic--on" : ""}`}
+        className={`icon-btn ${screenOn ? "icon-btn--active" : ""}`}
         onClick={onToggleScreen}
         disabled={disabled}
         aria-pressed={screenOn}
-        title={
-          screenOn
-            ? "Arrêter le partage d'écran"
-            : "Partager l'écran (une capture par tour est envoyée à l'IA)"
-        }
+        title={screenOn ? "Arrêter le partage d'écran" : "Partager l'écran"}
       >
-        {screenOn ? "Écran ●" : "Écran ○"}
-      </button>
-      <button
-        type="button"
-        className="action-stop"
-        onClick={onStop}
-        disabled={disabled || !canStop}
-        title="Interrompre la réponse en cours"
-      >
-        Stop
+        <ScreenIcon />
       </button>
       <input
-        className="action-input"
+        className="composer-input"
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
-        placeholder={disabled ? "En attente du serveur…" : "Écris un message…"}
+        placeholder={disabled ? "En attente du serveur…" : "Envoyer un message"}
         disabled={disabled}
         aria-label="Message"
       />
-      <button className="action-send" type="submit" disabled={disabled || draft.trim() === ""}>
-        Envoyer
+      <button
+        type="button"
+        className="icon-btn icon-btn--stop"
+        onClick={onStop}
+        disabled={disabled || !canStop}
+        title="Interrompre la réponse"
+      >
+        <StopIcon />
+      </button>
+      <button
+        className="icon-btn icon-btn--send"
+        type="submit"
+        disabled={disabled || draft.trim() === ""}
+        title="Envoyer"
+      >
+        <SendIcon />
       </button>
     </form>
   );

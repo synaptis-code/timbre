@@ -19,6 +19,9 @@ ui/public/vad/
 Thumbs.db
 .DS_Store
 
+# Données locales (conversations, réglages)
+timbre.db
+
 # Modèles / données locales (jamais dans le repo)
 models/
 *.onnx

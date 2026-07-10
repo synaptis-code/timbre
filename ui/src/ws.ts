@@ -8,7 +8,9 @@ export interface TimbreSocketHandlers {
   onStatus: (status: ConnectionStatus) => void;
 }
 
-const DEFAULT_URL = "ws://127.0.0.1:8765/ws";
+export const WS_BASE =
+  (import.meta.env.VITE_WS_URL as string | undefined) ?? "ws://127.0.0.1:8765/ws";
+const DEFAULT_URL = WS_BASE;
 const RECONNECT_MIN_MS = 500;
 const RECONNECT_MAX_MS = 5000;
 

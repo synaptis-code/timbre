@@ -15,6 +15,12 @@ class Conversation:
         """Changement de persona : effet immédiat, l'historique est conservé."""
         self._system_prompt = system_prompt
 
+    def seed(self, turns: list[tuple[str, str]]) -> None:
+        """Recharge un historique persisté (rôle, contenu) — texte uniquement."""
+        for role, content in turns:
+            if content:
+                self._turns.append({"role": role, "content": content})
+
     def add_user(self, text: str, image: str | None = None) -> None:
         """`image` : data-URL d'une capture d'écran (format multimodal OpenAI).
 

@@ -11,6 +11,8 @@ from timbre.protocol.states import AppState
 logger = logging.getLogger(__name__)
 
 SendFn = Callable[[AnyServerMessage], Awaitable[None]]
+# (role, contenu, interrompu) → écrit dans la persistance locale.
+PersistFn = Callable[[str, str, bool], Awaitable[None]]
 
 
 class Session:
@@ -20,11 +22,31 @@ class Session:
     le client — le front n'a jamais à deviner l'état du backend.
     """
 
-    def __init__(self, send: SendFn, conversation: Conversation, persona: Persona) -> None:
+    def __init__(
+        self,
+        send: SendFn,
+        conversation: Conversation,
+        persona: Persona,
+        persist: PersistFn | None = None,
+    ) -> None:
         self._send = send
+        self._persist = persist
         self._state = AppState.IDLE
         self.conversation = conversation
         self.persona = persona
+
+    async def persist_message(self, role: str, content: str, interrupted: bool = False) -> None:
+        """Archive un message en base (si la session est liée à une conversation).
+
+        Un échec de persistance est loggé mais n'interrompt jamais le tour :
+        la conversation en cours prime sur l'historique.
+        """
+        if self._persist is None or not content:
+            return
+        try:
+            await self._persist(role, content, interrupted)
+        except Exception:
+            logger.exception("échec de persistance du message (%s)", role)
 
     @property
     def state(self) -> AppState:

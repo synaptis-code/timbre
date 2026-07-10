@@ -102,6 +102,7 @@ class Orchestrator:
         await self.send_persona_list(session)
         if persona.greeting:
             session.conversation.add_assistant(persona.greeting)
+            await session.persist_message("assistant", persona.greeting)
             await session.send(AiChunk(text=persona.greeting, last=True))
             await self._speak_one(session, persona.greeting)
 
@@ -236,6 +237,7 @@ class Orchestrator:
             )
             image = None
         conversation.add_user(user_text, image=image)
+        await session.persist_message("user", user_text)
 
         timer = _TurnTimer(started=time.perf_counter())
         splitter = SentenceSplitter()
@@ -290,7 +292,9 @@ class Orchestrator:
                 await session.send(AiChunk(text="", last=True, interrupted=True))
             # Seul le texte réellement émis entre dans l'historique (bug n°3) —
             # un tour interrompu est archivé tel quel, jamais inventé.
-            conversation.add_assistant("".join(emitted))
+            assistant_text = "".join(emitted)
+            conversation.add_assistant(assistant_text)
+            await session.persist_message("assistant", assistant_text, interrupted)
             vram = await vram_snapshot()
             await session.send(
                 TurnMetrics(

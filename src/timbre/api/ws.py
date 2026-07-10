@@ -31,6 +31,7 @@ from timbre.protocol.messages import (
     parse_client_message,
 )
 from timbre.protocol.states import AppState
+from timbre.storage import Role, Storage
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     await websocket.accept()
     orchestrator: Orchestrator = websocket.app.state.orchestrator
     settings: Settings = websocket.app.state.settings
+    storage: Storage = websocket.app.state.storage
     send_lock = asyncio.Lock()
 
     async def send(message: AnyServerMessage) -> None:
@@ -55,11 +57,36 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         except WebSocketDisconnect:
             logger.debug("envoi ignoré : client déconnecté pendant l'écriture")
 
+    # `?conversation=<id>` : session liée à une conversation persistée
+    # (historique rechargé, nouveaux messages archivés). Sans paramètre :
+    # session éphémère, rien n'est écrit.
+    conversation_id = websocket.query_params.get("conversation")
+    persist = None
+    if conversation_id is not None:
+        if await storage.get_conversation(conversation_id) is None:
+            await websocket.send_text(
+                ErrorMessage(
+                    code="conversation_not_found",
+                    message="Conversation introuvable — recharge la liste.",
+                ).model_dump_json()
+            )
+            await websocket.close()
+            return
+        bound_id = conversation_id
+
+        async def persist(role: str, content: str, interrupted: bool) -> None:
+            stored_role: Role = "assistant" if role == "assistant" else "user"
+            await storage.add_message(bound_id, stored_role, content, interrupted)
+
     session = Session(
         send=send,
         conversation=Conversation(settings.system_prompt),
         persona=orchestrator.fallback_persona,
+        persist=persist,
     )
+    if conversation_id is not None:
+        history = await storage.list_messages(conversation_id)
+        session.conversation.seed([(m.role, m.content) for m in history])
     turn_task: asyncio.Task[None] | None = None
 
     async def cancel_current_turn() -> None:
