@@ -38,10 +38,10 @@ export function ProvidersSection() {
 
   if (state === null) {
     return (
-      <section className="color-block color-block--lilac">
-        <p className="eyebrow">Fournisseur d'IA</p>
-        <p className="color-block-body">{feedback?.text ?? "Chargement…"}</p>
-      </section>
+      <>
+        <h1 className="settings-title">Fournisseur d'IA</h1>
+        <p className="settings-subtitle">{feedback?.text ?? "Chargement…"}</p>
+      </>
     );
   }
 
@@ -93,10 +93,9 @@ export function ProvidersSection() {
     }, "Modèles chargés.");
 
   return (
-    <section className="color-block color-block--lilac">
-      <p className="eyebrow">Fournisseur d'IA</p>
-      <h2 className="color-block-title">Fournisseur d'IA</h2>
-      <p className="color-block-body">
+    <>
+      <h1 className="settings-title">Fournisseur d'IA</h1>
+      <p className="settings-subtitle">
         Timbre est local d'abord. Les fournisseurs cloud sont possibles — leurs clés restent
         stockées sur cette machine, mais tes conversations partiront chez eux.
       </p>
@@ -209,6 +208,6 @@ export function ProvidersSection() {
           )}
         </div>
       )}
-    </section>
+    </>
   );
 }
