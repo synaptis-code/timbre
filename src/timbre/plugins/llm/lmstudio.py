@@ -126,3 +126,36 @@ class LMStudioBackend(LLMBackend):
                 "llm_unreachable",
                 f"LM Studio injoignable sur {self._base_url}. {_START_HINT}",
             ) from exc
+
+
+async def fetch_lmstudio_models(
+    base_url: str, client: httpx2.AsyncClient | None = None
+) -> list[str]:
+    """Tous les modèles TÉLÉCHARGÉS dans LM Studio (chargés ou non), sans embeddings.
+
+    Utilise l'API native `/api/v0/models` : contrairement à `/v1/models` (qui ne
+    liste que les modèles chargés), elle expose tout le catalogue local.
+    """
+    owns_client = client is None
+    http = client or httpx2.AsyncClient(timeout=15.0)
+    try:
+        response = await http.get(f"{base_url.rstrip('/')}/api/v0/models")
+        if response.status_code == 200:
+            return sorted(
+                str(entry["id"])
+                for entry in response.json().get("data", [])
+                if entry.get("type") in ("llm", "vlm")
+            )
+        # Vieilles versions sans /api/v0 : repli sur /v1/models (modèles chargés).
+        response = await http.get(f"{base_url.rstrip('/')}/v1/models")
+        if response.status_code != 200:
+            raise LLMError(
+                "llm_http_error",
+                f"LM Studio a répondu {response.status_code} sur la liste des modèles.",
+            )
+        return sorted(str(e["id"]) for e in response.json().get("data", []) if "id" in e)
+    except httpx2.HTTPError as exc:
+        raise LLMError("llm_unreachable", f"LM Studio injoignable. {_START_HINT}") from exc
+    finally:
+        if owns_client:
+            await http.aclose()

@@ -6,7 +6,7 @@ import httpx2
 import pytest
 
 from timbre.plugins.base import LLMError
-from timbre.plugins.llm.lmstudio import LMStudioBackend
+from timbre.plugins.llm.lmstudio import LMStudioBackend, fetch_lmstudio_models
 
 
 def make_backend(handler, **kwargs) -> LMStudioBackend:
@@ -56,6 +56,34 @@ async def test_active_model_unreachable():
     with pytest.raises(LLMError) as exc_info:
         await make_backend(handler).active_model()
     assert exc_info.value.code == "llm_unreachable"
+
+
+async def test_fetch_lmstudio_models_lists_all_downloaded_without_embeddings():
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        assert request.url.path == "/api/v0/models"
+        return models_v0(
+            {"id": "qwen2.5-vl-7b", "type": "vlm", "state": "loaded"},
+            {"id": "gemma-3-1b", "type": "llm", "state": "not-loaded"},
+            {"id": "nomic-embed", "type": "embeddings", "state": "not-loaded"},
+        )
+
+    client = httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
+    # Modèles chargés ET non chargés listés ; embeddings exclus ; triés.
+    assert await fetch_lmstudio_models("http://lmstudio.test", client) == [
+        "gemma-3-1b",
+        "qwen2.5-vl-7b",
+    ]
+
+
+async def test_fetch_lmstudio_models_falls_back_to_v1():
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path == "/api/v0/models":
+            return httpx2.Response(404)
+        assert request.url.path == "/v1/models"
+        return httpx2.Response(200, json={"data": [{"id": "vieux"}]})
+
+    client = httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
+    assert await fetch_lmstudio_models("http://lmstudio.test", client) == ["vieux"]
 
 
 async def test_supports_vision_follows_active_model_type():

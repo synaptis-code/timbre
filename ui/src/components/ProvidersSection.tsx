@@ -132,65 +132,72 @@ export function ProvidersSection() {
             )}
           </div>
 
-          {selected.id === "lmstudio" ? (
-            <p className="settings-hint">
-              Détection automatique du modèle chargé dans LM Studio — rien à configurer.
-            </p>
-          ) : (
-            <>
-              <label className="provider-field">
-                <span>URL de base</span>
+          <label className="provider-field">
+            <span>URL de base</span>
+            <input
+              value={baseUrl}
+              onChange={(event) => setBaseUrl(event.target.value)}
+              spellCheck={false}
+            />
+          </label>
+          {selected.needs_key && (
+            <label className="provider-field">
+              <span>Clé API {selected.has_key && "· une clé est enregistrée"}</span>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(event) => setApiKey(event.target.value)}
+                placeholder={selected.has_key ? "••••••••  (laisser vide pour conserver)" : ""}
+                autoComplete="off"
+              />
+            </label>
+          )}
+          <label className="provider-field">
+            <span>
+              Modèle{" "}
+              {selected.id === "lmstudio" && (
+                <span className="provider-field-note">· vide = modèle chargé auto-détecté</span>
+              )}
+            </span>
+            <div className="provider-model-row">
+              {models.length > 0 ? (
+                <select value={model} onChange={(event) => setModel(event.target.value)}>
+                  {selected.id === "lmstudio" && (
+                    <option value="">Automatique (modèle chargé)</option>
+                  )}
+                  {models.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
                 <input
-                  value={baseUrl}
-                  onChange={(event) => setBaseUrl(event.target.value)}
+                  value={model}
+                  onChange={(event) => setModel(event.target.value)}
+                  placeholder={
+                    selected.id === "lmstudio"
+                      ? "« Sélectionner un modèle » pour lister ceux de LM Studio"
+                      : "nom du modèle"
+                  }
                   spellCheck={false}
                 />
-              </label>
-              {selected.needs_key && (
-                <label className="provider-field">
-                  <span>Clé API {selected.has_key && "· une clé est enregistrée"}</span>
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(event) => setApiKey(event.target.value)}
-                    placeholder={selected.has_key ? "••••••••  (laisser vide pour conserver)" : ""}
-                    autoComplete="off"
-                  />
-                </label>
               )}
-              <label className="provider-field">
-                <span>Modèle</span>
-                <div className="provider-model-row">
-                  <input
-                    value={model}
-                    onChange={(event) => setModel(event.target.value)}
-                    list={`models-${selected.id}`}
-                    spellCheck={false}
-                  />
-                  <datalist id={`models-${selected.id}`}>
-                    {models.map((name) => (
-                      <option key={name} value={name} />
-                    ))}
-                  </datalist>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={loadModels}
-                    disabled={busy}
-                  >
-                    Charger les modèles
-                  </button>
-                </div>
-              </label>
-            </>
-          )}
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={loadModels}
+                disabled={busy}
+              >
+                Sélectionner un modèle
+              </button>
+            </div>
+          </label>
 
           <div className="provider-actions">
-            {selected.id !== "lmstudio" && (
-              <button type="button" className="btn-secondary" onClick={save} disabled={busy}>
-                Enregistrer
-              </button>
-            )}
+            <button type="button" className="btn-secondary" onClick={save} disabled={busy}>
+              Enregistrer
+            </button>
             <button
               type="button"
               className="btn-primary"

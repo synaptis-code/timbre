@@ -854,9 +854,26 @@ body {
   gap: 8px;
 }
 
-.provider-model-row input {
+.provider-model-row input,
+.provider-model-row select {
   flex: 1;
   min-width: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 9px 12px;
+  font: inherit;
+  font-weight: 400;
+  color: var(--ink);
+  background: var(--canvas);
+}
+
+.provider-field-note {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  opacity: 0.5;
+  font-weight: 400;
 }
 
 .provider-model-row .btn-secondary {

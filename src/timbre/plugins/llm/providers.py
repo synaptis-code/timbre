@@ -12,7 +12,7 @@ from typing import Literal
 from timbre.config import Settings
 from timbre.plugins.base import LLMBackend, LLMError
 from timbre.plugins.llm.anthropic import AnthropicBackend, fetch_anthropic_models
-from timbre.plugins.llm.lmstudio import LMStudioBackend
+from timbre.plugins.llm.lmstudio import LMStudioBackend, fetch_lmstudio_models
 from timbre.plugins.llm.openai_compat import OpenAICompatibleBackend, fetch_openai_models
 from timbre.storage import Storage
 
@@ -137,13 +137,13 @@ class ProviderManager:
         if spec.kind == "anthropic":
             return await fetch_anthropic_models(base_url, api_key or "")
         if spec.kind == "lmstudio":
-            return await fetch_openai_models(f"{base_url.rstrip('/')}/v1", api_key)
+            return await fetch_lmstudio_models(base_url)
         return await fetch_openai_models(base_url, api_key)
 
     async def _build(self, spec: ProviderSpec) -> LLMBackend:
         base_url, api_key, model = await self.config(spec)
         if spec.kind == "lmstudio":
-            return self._build_lmstudio(base_url)
+            return self._build_lmstudio(base_url, model)
         if spec.kind == "anthropic":
             return AnthropicBackend(
                 base_url,
@@ -159,9 +159,10 @@ class ProviderManager:
             temperature=self._settings.llm_temperature,
         )
 
-    def _build_lmstudio(self, base_url: str) -> LMStudioBackend:
+    def _build_lmstudio(self, base_url: str, model: str | None = None) -> LMStudioBackend:
+        # `model=None` (aucun modèle choisi) → auto-détection du modèle chargé.
         return LMStudioBackend(
             base_url,
-            model_override=self._settings.llm_model,
+            model_override=model or self._settings.llm_model,
             temperature=self._settings.llm_temperature,
         )
