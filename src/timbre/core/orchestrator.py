@@ -21,6 +21,7 @@ from timbre.core.tts_text import clean_for_tts, is_speakable
 from timbre.personas.models import Persona
 from timbre.personas.store import PersonaError, PersonaStore
 from timbre.plugins.base import ASRBackend, ASRError, LLMBackend, LLMError, TTSBackend, TTSError
+from timbre.plugins.llm.providers import ProviderManager
 from timbre.protocol.messages import (
     AiAudio,
     AiChunk,
@@ -56,19 +57,24 @@ class _TurnTimer:
 class Orchestrator:
     def __init__(
         self,
-        llm: LLMBackend,
+        llm_manager: ProviderManager,
         tts_engines: dict[str, TTSBackend],
         asr: ASRBackend | None,
         persona_store: PersonaStore,
         default_persona_id: str,
         fallback_persona: Persona,
     ) -> None:
-        self._llm = llm
+        self._llm_manager = llm_manager
         self._tts_engines = tts_engines
         self._asr = asr
         self._store = persona_store
         self._default_persona_id = default_persona_id
         self.fallback_persona = fallback_persona
+
+    @property
+    def _llm(self) -> LLMBackend:
+        """Backend courant du gestionnaire : permuter de fournisseur = effet immédiat."""
+        return self._llm_manager.current
 
     # ── Personas ────────────────────────────────────────────────────────────
 

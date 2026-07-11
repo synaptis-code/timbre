@@ -16,7 +16,7 @@ from timbre.personas.models import Persona, VoiceConfig
 from timbre.personas.store import PersonaStore
 from timbre.plugins.asr.whisper import FasterWhisperASR
 from timbre.plugins.base import ASRBackend, LLMBackend, TTSBackend
-from timbre.plugins.llm.lmstudio import LMStudioBackend
+from timbre.plugins.llm.providers import ProviderManager
 from timbre.plugins.tts.edge import EdgeTTSBackend
 from timbre.storage import Storage
 
@@ -33,15 +33,6 @@ def create_app(
     `tts` injecté est enregistré sous le nom de moteur « edge-tts ».
     """
     app_settings = settings if settings is not None else Settings()
-    llm_backend = (
-        llm
-        if llm is not None
-        else LMStudioBackend(
-            app_settings.lmstudio_base_url,
-            model_override=app_settings.llm_model,
-            temperature=app_settings.llm_temperature,
-        )
-    )
     tts_backend = (
         tts if tts is not None else (EdgeTTSBackend() if app_settings.tts_enabled else None)
     )
@@ -72,13 +63,15 @@ def create_app(
     )
 
     storage = Storage(Path(app_settings.database_path))
+    llm_manager = ProviderManager(storage, app_settings, override=llm)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await storage.connect()
+        await llm_manager.reload()
         yield
         await storage.aclose()
-        await llm_backend.aclose()
+        await llm_manager.aclose()
 
     app = FastAPI(title="Timbre", version=__version__, lifespan=lifespan)
     # L'UI de dev (Vite) tourne sur un autre port : autoriser les appels REST locaux.
@@ -90,8 +83,9 @@ def create_app(
     )
     app.state.settings = app_settings
     app.state.storage = storage
+    app.state.llm_manager = llm_manager
     app.state.orchestrator = Orchestrator(
-        llm=llm_backend,
+        llm_manager=llm_manager,
         tts_engines=tts_engines,
         asr=asr_backend,
         persona_store=persona_store,

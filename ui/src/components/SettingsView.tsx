@@ -1,5 +1,6 @@
 import { BackIcon } from "../icons";
 import type { TurnMetrics } from "../protocol";
+import { ProvidersSection } from "./ProvidersSection";
 
 interface SettingsViewProps {
   language: string;
@@ -19,24 +20,6 @@ const LANGUAGES = [
   ["de", "Deutsch"],
   ["it", "Italiano"],
 ] as const;
-
-const PROVIDERS = [
-  "LM Studio",
-  "Ollama",
-  "OpenAI",
-  "Anthropic",
-  "Gemini",
-  "NVIDIA NIM",
-  "Together AI",
-  "DeepSeek",
-  "Groq",
-  "Mistral",
-  "OpenRouter",
-  "LocalAI",
-  "xAI",
-  "SambaNova",
-  "Lemonade",
-];
 
 const ms = (value: number | null | undefined) => (value == null ? "—" : `${value} ms`);
 
@@ -82,21 +65,7 @@ export function SettingsView({
         </div>
       </section>
 
-      <section className="color-block color-block--lilac">
-        <p className="eyebrow">Bientôt — V2.2</p>
-        <h2 className="color-block-title">Fournisseur d'IA</h2>
-        <p className="color-block-body">
-          Aujourd'hui : LM Studio, avec détection automatique du modèle chargé. Bientôt, tu
-          pourras brancher le fournisseur de ton choix — les clés resteront stockées en local.
-        </p>
-        <div className="provider-chips" aria-hidden="true">
-          {PROVIDERS.map((name) => (
-            <span key={name} className={`chip ${name === "LM Studio" ? "chip--active" : ""}`}>
-              {name}
-            </span>
-          ))}
-        </div>
-      </section>
+      <ProvidersSection />
 
       <section className="color-block color-block--cream">
         <p className="eyebrow">Bientôt — V2.3</p>

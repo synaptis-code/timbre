@@ -6,14 +6,13 @@ suffit — Timbre suit automatiquement. `TIMBRE_LLM_MODEL` permet de forcer un
 modèle précis si besoin.
 """
 
-import json
 import logging
 from collections.abc import AsyncIterator
-from typing import Any
 
 import httpx2
 
 from timbre.plugins.base import LLMBackend, LLMError
+from timbre.plugins.llm.sse import SSEChatParser
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ class LMStudioBackend(LLMBackend):
         self._model_override = model_override
         self._temperature = temperature
         self._client = client or httpx2.AsyncClient(timeout=httpx2.Timeout(10.0, read=300.0))
-        self._warned_reasoning_model: str | None = None
+        self._warned_models: set[str] = set()
         # Type du dernier modèle résolu ("llm" | "vlm" | None si inconnu).
         self._active_model_type: str | None = None
 
@@ -108,8 +107,9 @@ class LMStudioBackend(LLMBackend):
                         "llm_http_error",
                         f"LM Studio a répondu {response.status_code} : {body[:300]}",
                     )
+                parser = SSEChatParser(model, self._warned_models)
                 async for line in response.aiter_lines():
-                    token = self._parse_sse_line(line, model)
+                    token = parser.parse(line)
                     if token is not None:
                         yield token
         except httpx2.HTTPError as exc:
@@ -117,32 +117,6 @@ class LMStudioBackend(LLMBackend):
                 "llm_unreachable",
                 f"Connexion à LM Studio perdue pendant la génération : {exc}. {_START_HINT}",
             ) from exc
-
-    def _parse_sse_line(self, line: str, model: str) -> str | None:
-        if not line.startswith("data: "):
-            return None
-        data = line[len("data: ") :].strip()
-        if not data or data == "[DONE]":
-            return None
-        try:
-            choices = json.loads(data).get("choices", [])
-        except json.JSONDecodeError:
-            logger.warning("ligne SSE illisible ignorée : %.200s", data)
-            return None
-        if not choices:
-            return None
-        delta: dict[str, Any] = choices[0].get("delta", {})
-        # Les modèles « raisonnants » émettent reasoning_content avant de répondre :
-        # on ne l'affiche pas et on prévient (latence — voir §3.5 du plan).
-        if delta.get("reasoning_content") and self._warned_reasoning_model != model:
-            self._warned_reasoning_model = model
-            logger.warning(
-                "%s est un modèle 'raisonnant' : latence élevée à prévoir. "
-                "Préférer un modèle Instruct pour le vocal.",
-                model,
-            )
-        content = delta.get("content")
-        return str(content) if content else None
 
     async def _get(self, path: str) -> httpx2.Response:
         try:

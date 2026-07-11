@@ -22,9 +22,33 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   });
   if (!response.ok) {
-    throw new Error(`API ${path} : ${response.status} ${response.statusText}`);
+    let detail = `${response.status} ${response.statusText}`;
+    try {
+      const body: unknown = await response.json();
+      if (typeof body === "object" && body !== null && "detail" in body) {
+        detail = String((body as { detail: unknown }).detail);
+      }
+    } catch {
+      // corps non-JSON : on garde le statut HTTP
+    }
+    throw new Error(detail);
   }
   return (response.status === 204 ? undefined : await response.json()) as T;
+}
+
+export interface ProviderInfo {
+  id: string;
+  name: string;
+  local: boolean;
+  needs_key: boolean;
+  base_url: string;
+  model: string | null;
+  has_key: boolean;
+}
+
+export interface ProvidersState {
+  active: string;
+  providers: ProviderInfo[];
 }
 
 export const api = {
@@ -38,6 +62,19 @@ export const api = {
   deleteConversation: (id: string) =>
     request<void>(`/api/conversations/${id}`, { method: "DELETE" }),
   listMessages: (id: string) => request<StoredMessage[]>(`/api/conversations/${id}/messages`),
+  getProviders: () => request<ProvidersState>("/api/providers"),
+  updateProvider: (id: string, config: { api_key?: string; base_url?: string; model?: string }) =>
+    request<ProvidersState>(`/api/providers/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(config),
+    }),
+  setActiveProvider: (id: string) =>
+    request<ProvidersState>("/api/providers/active", {
+      method: "PUT",
+      body: JSON.stringify({ provider: id }),
+    }),
+  listProviderModels: (id: string) =>
+    request<{ models: string[] }>(`/api/providers/${id}/models`),
   getSettings: () => request<{ language: string }>("/api/settings"),
   putSettings: (language: string) =>
     request<{ language: string }>("/api/settings", {
