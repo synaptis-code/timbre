@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { BackIcon } from "../icons";
 import type { TurnMetrics } from "../protocol";
+import { PersonasSection } from "./PersonasSection";
 import { ProvidersSection } from "./ProvidersSection";
 
 interface SettingsViewProps {
   language: string;
   metrics: TurnMetrics | null;
   asrDevice: string | null;
-  activePersona: string;
   disabled: boolean;
   onLanguageChange: (language: string) => void;
   onSetAsrDevice: (device: "cuda" | "cpu") => void;
@@ -37,7 +37,6 @@ export function SettingsView({
   language,
   metrics,
   asrDevice,
-  activePersona,
   disabled,
   onLanguageChange,
   onSetAsrDevice,
@@ -95,20 +94,7 @@ export function SettingsView({
 
         {category === "providers" && <ProvidersSection />}
 
-        {category === "personas" && (
-          <>
-            <h1 className="settings-title">Personas</h1>
-            <section className="color-block color-block--cream">
-              <p className="eyebrow">Bientôt — V2.3</p>
-              <h2 className="color-block-title">Créés ici, sans fichier</h2>
-              <p className="color-block-body">
-                Création et édition des personas directement dans cette page (personnalité,
-                voix, accueil), et invocation dans la conversation avec «&nbsp;@&nbsp;».
-                Persona actif&nbsp;: <strong>{activePersona || "Timbre"}</strong>.
-              </p>
-            </section>
-          </>
-        )}
+        {category === "personas" && <PersonasSection />}
 
         {category === "diagnostic" && (
           <>

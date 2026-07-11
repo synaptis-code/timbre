@@ -535,6 +535,7 @@ body {
 }
 
 .composer {
+  position: relative;
   max-width: 720px;
   margin: 0 auto;
   display: flex;
@@ -544,6 +545,50 @@ body {
   border-radius: var(--r-lg);
   padding: 8px;
   background: var(--canvas);
+}
+
+/* — Popup d'invocation @persona — */
+.mention-pop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  min-width: 200px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  z-index: 10;
+}
+
+.mention-item {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.mention-item--on,
+.mention-item:hover {
+  background: var(--ink);
+  color: var(--canvas);
+}
+
+.mention-at {
+  font-family: var(--mono);
+  opacity: 0.5;
+  margin-right: 4px;
+}
+
+.mention-item--on .mention-at {
+  opacity: 0.7;
 }
 
 .composer:focus-within {
@@ -900,6 +945,117 @@ body {
 
 .provider-feedback--error {
   color: var(--magenta);
+}
+
+/* — Personas — */
+.settings-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.persona-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.persona-card {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.persona-card:hover {
+  border-color: var(--ink);
+}
+
+.persona-card-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 14px 16px;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.persona-card-main strong {
+  font-weight: 540;
+}
+
+.persona-card-prompt {
+  font-size: 13px;
+  opacity: 0.55;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.persona-card-delete {
+  flex: none;
+  background: none;
+  border: none;
+  border-left: 1px solid var(--hairline);
+  padding: 0 14px;
+  color: var(--ink);
+  opacity: 0.4;
+  cursor: pointer;
+}
+
+.persona-card-delete:hover {
+  opacity: 1;
+  color: var(--magenta);
+}
+
+.persona-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 640px;
+}
+
+.persona-editor .provider-field input,
+.persona-editor .provider-field select,
+.persona-prompt {
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 9px 12px;
+  font: inherit;
+  font-weight: 400;
+  color: var(--ink);
+  background: var(--canvas);
+  width: 100%;
+}
+
+.persona-prompt {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.persona-editor-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.persona-editor-row > * {
+  flex: 1;
+  min-width: 160px;
+}
+
+.persona-field-sm input[type="range"] {
+  width: 100%;
+  accent-color: var(--ink);
 }
 
 .diag-grid {

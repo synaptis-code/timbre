@@ -48,12 +48,16 @@ class Interrupt(BaseModel):
 
 
 class SetPersona(BaseModel):
-    """Client → serveur : change de persona. Refusé avec raison si invalide (jamais en silence)."""
+    """Client → serveur : change de persona. Refusé avec raison si invalide (jamais en silence).
+
+    `greet=False` pour une invocation « @ » silencieuse (pas de message d'accueil).
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["set_persona"] = "set_persona"
     persona_id: str = Field(min_length=1)
+    greet: bool = True
 
 
 class ListPersonas(BaseModel):

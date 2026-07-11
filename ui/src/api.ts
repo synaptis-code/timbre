@@ -51,6 +51,31 @@ export interface ProvidersState {
   providers: ProviderInfo[];
 }
 
+export interface Persona {
+  id: string;
+  name: string;
+  language: string;
+  system_prompt: string;
+  voice: { engine: string; voice_id: string; params: { rate: number; pitch: number } };
+  greeting: string;
+  temperature: number;
+}
+
+export interface PersonaPayload {
+  name: string;
+  system_prompt: string;
+  voice_id: string;
+  rate: number;
+  pitch: number;
+  greeting: string;
+  temperature: number;
+}
+
+export interface VoiceOption {
+  id: string;
+  label: string;
+}
+
 export const api = {
   listConversations: () => request<ConversationMeta[]>("/api/conversations"),
   createConversation: () => request<ConversationMeta>("/api/conversations", { method: "POST" }),
@@ -75,6 +100,13 @@ export const api = {
     }),
   listProviderModels: (id: string) =>
     request<{ models: string[] }>(`/api/providers/${id}/models`),
+  listPersonas: () => request<Persona[]>("/api/personas"),
+  createPersona: (payload: PersonaPayload) =>
+    request<Persona>("/api/personas", { method: "POST", body: JSON.stringify(payload) }),
+  updatePersona: (id: string, payload: PersonaPayload) =>
+    request<Persona>(`/api/personas/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  deletePersona: (id: string) => request<void>(`/api/personas/${id}`, { method: "DELETE" }),
+  listVoices: () => request<VoiceOption[]>("/api/voices"),
   getSettings: () => request<{ language: string }>("/api/settings"),
   putSettings: (language: string) =>
     request<{ language: string }>("/api/settings", {

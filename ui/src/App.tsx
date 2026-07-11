@@ -300,7 +300,6 @@ export default function App() {
           language={language}
           metrics={metrics}
           asrDevice={asrDevice}
-          activePersona={personaName}
           disabled={status !== "connected"}
           onLanguageChange={changeLanguage}
           onSetAsrDevice={(device) => socketRef.current?.send({ type: "set_asr_device", device })}
@@ -336,10 +335,14 @@ export default function App() {
               micOn={micOn}
               screenOn={screenOn}
               canStop={canStop}
+              personas={personas}
               onToggleMic={() => void micRef.current?.toggle()}
               onToggleScreen={() => void screenRef.current?.toggle()}
               onStop={stopTurn}
               onSend={sendUserMessage}
+              onInvokePersona={(id) =>
+                socketRef.current?.send({ type: "set_persona", persona_id: id, greet: false })
+              }
             />
           </div>
         </div>

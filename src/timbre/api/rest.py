@@ -4,9 +4,12 @@ Tout est persisté en SQLite local — les clés API ne quittent jamais la
 machine et ne sont jamais renvoyées par l'API (seulement un indicateur).
 """
 
-from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
+import re
 
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field, ValidationError
+
+from timbre.personas.models import Persona, VoiceConfig, VoiceParams
 from timbre.plugins.base import LLMError
 from timbre.plugins.llm.providers import (
     ACTIVE_KEY,
@@ -169,6 +172,106 @@ async def list_provider_models(request: Request, provider_id: str) -> ModelsResp
         return ModelsResponse(models=await _manager(request).list_models(provider_id))
     except LLMError as exc:
         raise HTTPException(status_code=502, detail=exc.message) from exc
+
+
+# ── Personas ─────────────────────────────────────────────────────────────
+
+# Voix FR edge-tts proposées dans l'éditeur (id → libellé lisible).
+FRENCH_VOICES: list[dict[str, str]] = [
+    {"id": "fr-FR-VivienneMultilingualNeural", "label": "Vivienne · France (F)"},
+    {"id": "fr-FR-DeniseNeural", "label": "Denise · France (F)"},
+    {"id": "fr-FR-EloiseNeural", "label": "Éloïse · France (F, jeune)"},
+    {"id": "fr-FR-HenriNeural", "label": "Henri · France (H)"},
+    {"id": "fr-FR-RemyMultilingualNeural", "label": "Rémy · France (H)"},
+    {"id": "fr-CA-SylvieNeural", "label": "Sylvie · Québec (F)"},
+    {"id": "fr-CA-AntoineNeural", "label": "Antoine · Québec (H)"},
+    {"id": "fr-CA-JeanNeural", "label": "Jean · Québec (H)"},
+    {"id": "fr-CA-ThierryNeural", "label": "Thierry · Québec (H)"},
+    {"id": "fr-BE-CharlineNeural", "label": "Charline · Belgique (F)"},
+    {"id": "fr-BE-GerardNeural", "label": "Gérard · Belgique (H)"},
+    {"id": "fr-CH-ArianeNeural", "label": "Ariane · Suisse (F)"},
+    {"id": "fr-CH-FabriceNeural", "label": "Fabrice · Suisse (H)"},
+]
+
+
+@router.get("/voices")
+def list_voices() -> list[dict[str, str]]:
+    return FRENCH_VOICES
+
+
+class PersonaPayload(BaseModel):
+    """Champs éditables d'un persona (l'id est dérivé du nom à la création)."""
+
+    name: str = Field(min_length=1, max_length=48)
+    system_prompt: str = Field(min_length=1)
+    voice_id: str = Field(min_length=1)
+    rate: float = Field(default=1.0, ge=0.5, le=2.0)
+    pitch: int = Field(default=0, ge=-50, le=50)
+    greeting: str = ""
+    temperature: float = Field(default=0.8, ge=0.0, le=2.0)
+
+
+def _slugify(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:32]
+    return slug or "persona"
+
+
+def _build_persona(persona_id: str, payload: PersonaPayload) -> Persona:
+    return Persona(
+        id=persona_id,
+        name=payload.name,
+        system_prompt=payload.system_prompt,
+        voice=VoiceConfig(
+            voice_id=payload.voice_id,
+            params=VoiceParams(rate=payload.rate, pitch=payload.pitch),
+        ),
+        greeting=payload.greeting,
+        temperature=payload.temperature,
+    )
+
+
+@router.get("/personas")
+async def list_personas(request: Request) -> list[Persona]:
+    return await _storage(request).list_personas()
+
+
+@router.post("/personas", status_code=201)
+async def create_persona(request: Request, payload: PersonaPayload) -> Persona:
+    storage = _storage(request)
+    base = _slugify(payload.name)
+    persona_id = base
+    suffix = 2
+    while await storage.persona_exists(persona_id):
+        persona_id = f"{base}-{suffix}"
+        suffix += 1
+    try:
+        persona = _build_persona(persona_id, payload)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    await storage.upsert_persona(persona, is_new=True)
+    return persona
+
+
+@router.put("/personas/{persona_id}")
+async def update_persona(request: Request, persona_id: str, payload: PersonaPayload) -> Persona:
+    storage = _storage(request)
+    if not await storage.persona_exists(persona_id):
+        raise HTTPException(status_code=404, detail="Persona introuvable.")
+    try:
+        persona = _build_persona(persona_id, payload)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    await storage.upsert_persona(persona, is_new=False)
+    return persona
+
+
+@router.delete("/personas/{persona_id}", status_code=204)
+async def delete_persona(request: Request, persona_id: str) -> None:
+    storage = _storage(request)
+    if await storage.count_personas() <= 1:
+        raise HTTPException(status_code=400, detail="Impossible de supprimer le dernier persona.")
+    if not await storage.delete_persona(persona_id):
+        raise HTTPException(status_code=404, detail="Persona introuvable.")
 
 
 class SettingsPayload(BaseModel):

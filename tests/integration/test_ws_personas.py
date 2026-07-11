@@ -1,6 +1,5 @@
-"""Tests d'intégration des personas : sélection, isolation, zéro fallback silencieux."""
+"""Tests d'intégration des personas (stockés en base) : sélection et @invocation."""
 
-import json
 import sys
 from pathlib import Path
 
@@ -13,38 +12,21 @@ from timbre.api.app import create_app
 from timbre.config import Settings
 
 
-def make_persona(persona_id: str, name: str, prompt: str, **extra) -> dict:
+def make_client(tmp_path: Path, llm: FakeLLM | None = None, tts: FakeTTS | None = None):
+    settings = Settings(database_path=str(tmp_path / "test.db"))
+    return TestClient(create_app(llm=llm or FakeLLM(), tts=tts or FakeTTS(), settings=settings))
+
+
+def make_payload(name: str, **extra) -> dict:
     return {
-        "id": persona_id,
         "name": name,
-        "system_prompt": prompt,
-        "voice": {"engine": "edge-tts", "voice_id": f"voix-{persona_id}"},
+        "system_prompt": f"Tu es {name}.",
+        "voice_id": f"voix-{name.lower()}",
         **extra,
     }
 
 
-def setup_dir(tmp_path: Path) -> Path:
-    directory = tmp_path / "personas"
-    directory.mkdir()
-    (directory / "lea.json").write_text(
-        json.dumps(make_persona("lea", "Léa", "Tu es Léa.", temperature=0.9)), encoding="utf-8"
-    )
-    (directory / "marc.json").write_text(
-        json.dumps(make_persona("marc", "Marc", "Tu es Marc.", greeting="Bonjour.")),
-        encoding="utf-8",
-    )
-    (directory / "casse.json").write_text("{ pas du json", encoding="utf-8")
-    return directory
-
-
-def connect(tmp_path: Path, llm: FakeLLM | None = None, tts: FakeTTS | None = None, **kw):
-    settings = Settings(personas_dir=str(setup_dir(tmp_path)), persona="lea", **kw)
-    app = create_app(llm=llm or FakeLLM(), tts=tts or FakeTTS(), settings=settings)
-    return TestClient(app).websocket_connect("/ws")
-
-
-def receive_connect_sequence(ws) -> dict:
-    """state_change + model_info + persona_list + asr_info ; renvoie la persona_list."""
+def receive_connect(ws) -> dict:
     assert ws.receive_json()["type"] == "state_change"
     assert ws.receive_json()["type"] == "model_info"
     persona_list = ws.receive_json()
@@ -60,97 +42,91 @@ def drain_until_idle(ws) -> list[dict]:
     return received
 
 
-def test_connect_sends_personas_with_statuses(tmp_path: Path):
-    with connect(tmp_path) as ws:
-        persona_list = receive_connect_sequence(ws)
-    assert persona_list["active"] == "lea"
-    by_id = {p["id"]: p for p in persona_list["personas"]}
-    assert by_id["lea"]["valid"] is True and by_id["lea"]["error"] is None
-    assert by_id["marc"]["valid"] is True
-    # Le persona cassé est listé, invalide, avec sa raison — et n'a rien cassé.
-    assert by_id["casse"]["valid"] is False
-    assert "JSON illisible" in by_id["casse"]["error"]
+def test_default_persona_seeded_and_active(tmp_path: Path):
+    with make_client(tmp_path) as client:
+        with client.websocket_connect("/ws") as ws:
+            persona_list = receive_connect(ws)
+        assert persona_list["active"] == "timbre"
+        assert [p["name"] for p in persona_list["personas"]] == ["Timbre"]
+        # REST : le persona par défaut existe.
+        personas = client.get("/api/personas").json()
+        assert personas[0]["id"] == "timbre"
 
 
-def test_set_persona_applies_prompt_voice_temperature_and_greets(tmp_path: Path):
-    llm = FakeLLM(tokens=["Oui."])
-    tts = FakeTTS()
-    with connect(tmp_path, llm=llm, tts=tts) as ws:
-        receive_connect_sequence(ws)
-
-        ws.send_json({"type": "set_persona", "persona_id": "marc"})
-        updated = ws.receive_json()
-        assert updated["type"] == "persona_list" and updated["active"] == "marc"
-        greeting = ws.receive_json()
-        assert greeting == {
-            "type": "ai_chunk",
-            "text": "Bonjour.",
-            "last": True,
-            "interrupted": False,
-        }
-        greeting_audio = ws.receive_json()
-        assert greeting_audio["type"] == "ai_audio" and greeting_audio["text"] == "Bonjour."
-
-        ws.send_json({"type": "user_message", "text": "Qui es-tu ?"})
-        drain_until_idle(ws)
-
-    messages = llm.received_messages[0]
-    assert messages[0] == {"role": "system", "content": "Tu es Marc."}
-    # Le message d'accueil fait partie de l'historique réel.
-    assert {"role": "assistant", "content": "Bonjour."} in messages
-    # Voix du persona (accueil + réponse) et température par défaut (marc n'en fixe pas).
-    assert tts.voices[0][0] == "voix-marc"
-    assert llm.received_temperatures == [0.8]
-
-
-def test_persona_temperature_reaches_llm(tmp_path: Path):
+def test_create_persona_appears_in_list_and_is_selectable(tmp_path: Path):
     llm = FakeLLM(tokens=["Ok."])
-    with connect(tmp_path, llm=llm) as ws:
-        receive_connect_sequence(ws)
-        ws.send_json({"type": "user_message", "text": "Salut"})
-        drain_until_idle(ws)
-    assert llm.received_temperatures == [0.9]  # température de Léa
+    tts = FakeTTS()
+    with make_client(tmp_path, llm=llm, tts=tts) as client:
+        created = client.post(
+            "/api/personas",
+            json=make_payload("Coach", greeting="On y va !", temperature=1.1, pitch=3),
+        )
+        assert created.status_code == 201
+        coach_id = created.json()["id"]
+        assert coach_id == "coach"
+
+        with client.websocket_connect("/ws") as ws:
+            persona_list = receive_connect(ws)
+            assert {p["id"] for p in persona_list["personas"]} == {"timbre", "coach"}
+
+            # Sélection explicite → accueil parlé + voix/température du persona.
+            ws.send_json({"type": "set_persona", "persona_id": coach_id})
+            assert ws.receive_json()["type"] == "persona_list"
+            greeting = ws.receive_json()
+            assert greeting["type"] == "ai_chunk" and greeting["text"] == "On y va !"
+            assert ws.receive_json()["type"] == "ai_audio"
+
+            ws.send_json({"type": "user_message", "text": "Salut"})
+            drain_until_idle(ws)
+
+    assert tts.voices[0][0] == "voix-coach"
+    assert llm.received_temperatures == [1.1]
 
 
-def test_set_invalid_persona_keeps_current_and_explains(tmp_path: Path):
-    with connect(tmp_path) as ws:
-        receive_connect_sequence(ws)
+def test_at_invocation_switches_silently(tmp_path: Path):
+    with make_client(tmp_path) as client:
+        client.post("/api/personas", json=make_payload("Marie", greeting="Coucou !"))
+        with client.websocket_connect("/ws") as ws:
+            receive_connect(ws)
+            # greet=False : aucun message d'accueil, juste la mise à jour de la liste.
+            ws.send_json({"type": "set_persona", "persona_id": "marie", "greet": False})
+            updated = ws.receive_json()
+            assert updated["type"] == "persona_list" and updated["active"] == "marie"
+            # Le tour suivant démarre directement, sans accueil intercalé.
+            ws.send_json({"type": "user_message", "text": "Salut Marie"})
+            assert ws.receive_json() == {"type": "state_change", "state": "thinking"}
 
-        ws.send_json({"type": "set_persona", "persona_id": "casse"})
-        error = ws.receive_json()
-        assert error["type"] == "error" and error["code"] == "persona_invalid"
-        assert "JSON illisible" in error["message"]
 
+def test_edit_persona_takes_effect_on_reconnect(tmp_path: Path):
+    llm = FakeLLM(tokens=["Ok."])
+    with make_client(tmp_path, llm=llm) as client:
+        client.put(
+            "/api/personas/timbre",
+            json=make_payload("Timbre", system_prompt="Tu es un pirate."),
+        )
+        with client.websocket_connect("/ws") as ws:
+            receive_connect(ws)
+            ws.send_json({"type": "user_message", "text": "Qui es-tu ?"})
+            drain_until_idle(ws)
+    assert llm.received_messages[0][0] == {"role": "system", "content": "Tu es un pirate."}
+
+
+def test_set_unknown_persona_keeps_current(tmp_path: Path):
+    with make_client(tmp_path) as client, client.websocket_connect("/ws") as ws:
+        receive_connect(ws)
         ws.send_json({"type": "set_persona", "persona_id": "fantome"})
-        assert ws.receive_json()["code"] == "persona_not_found"
-
-        # Le persona courant est conservé et fonctionnel.
-        ws.send_json({"type": "list_personas"})
-        assert ws.receive_json()["active"] == "lea"
-
-
-def test_invalid_default_persona_falls_back_explicitly(tmp_path: Path):
-    directory = tmp_path / "personas"
-    directory.mkdir()
-    settings = Settings(personas_dir=str(directory), persona="inexistant")
-    app = create_app(llm=FakeLLM(), tts=FakeTTS(), settings=settings)
-    with TestClient(app).websocket_connect("/ws") as ws:
-        assert ws.receive_json()["type"] == "state_change"
-        assert ws.receive_json()["type"] == "model_info"
-        # Jamais de bascule silencieuse : l'erreur arrive AVANT la liste.
         error = ws.receive_json()
         assert error["type"] == "error" and error["code"] == "persona_not_found"
-        assert "secours" in error["message"]
-        assert ws.receive_json()["active"] == "defaut"
 
 
-def test_list_personas_rescans_directory(tmp_path: Path):
-    with connect(tmp_path) as ws:
-        receive_connect_sequence(ws)
-        # Un nouveau persona apparaît sans redémarrage (rechargement à chaud).
-        (tmp_path / "personas" / "zoe.json").write_text(
-            json.dumps(make_persona("zoe", "Zoé", "Tu es Zoé.")), encoding="utf-8"
-        )
-        ws.send_json({"type": "list_personas"})
-        ids = {p["id"] for p in ws.receive_json()["personas"]}
-        assert "zoe" in ids
+def test_cannot_delete_last_persona(tmp_path: Path):
+    with make_client(tmp_path) as client:
+        assert client.delete("/api/personas/timbre").status_code == 400
+        client.post("/api/personas", json=make_payload("Autre"))
+        assert client.delete("/api/personas/timbre").status_code == 204
+
+
+def test_voices_endpoint(tmp_path: Path):
+    with make_client(tmp_path) as client:
+        voices = client.get("/api/voices").json()
+        assert any(v["id"] == "fr-FR-VivienneMultilingualNeural" for v in voices)

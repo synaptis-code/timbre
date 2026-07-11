@@ -23,6 +23,7 @@ export interface Interrupt {
 export interface SetPersona {
   type: "set_persona";
   persona_id: string;
+  greet?: boolean;
 }
 export interface ListPersonas {
   type: "list_personas";

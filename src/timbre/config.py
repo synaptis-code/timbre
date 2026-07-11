@@ -28,9 +28,8 @@ class Settings(BaseSettings):
     tts_enabled: bool = True
     tts_voice: str = "fr-FR-VivienneMultilingualNeural"
 
-    # Personas (dossier de fichiers JSON validés — voir personas/)
-    personas_dir: str = "personas"
-    persona: str = "timbre"  # persona actif à la connexion
+    # Personas (stockés en base locale ; créés/édités depuis l'UI)
+    persona: str = "timbre"  # persona actif par défaut à la connexion
 
     # Prompt système de secours, utilisé si le persona par défaut est invalide
     # (avec une erreur explicite — jamais de bascule silencieuse).

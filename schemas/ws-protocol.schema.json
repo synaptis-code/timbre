@@ -56,8 +56,13 @@
       },
       "SetPersona": {
         "additionalProperties": false,
-        "description": "Client → serveur : change de persona. Refusé avec raison si invalide (jamais en silence).",
+        "description": "Client → serveur : change de persona. Refusé avec raison si invalide (jamais en silence).\n\n`greet=False` pour une invocation « @ » silencieuse (pas de message d'accueil).",
         "properties": {
+          "greet": {
+            "default": true,
+            "title": "Greet",
+            "type": "boolean"
+          },
           "persona_id": {
             "minLength": 1,
             "title": "Persona Id",

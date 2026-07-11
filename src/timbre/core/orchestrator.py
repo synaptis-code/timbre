@@ -19,7 +19,7 @@ from timbre.core.segmenter import SentenceSplitter
 from timbre.core.session import Session
 from timbre.core.tts_text import clean_for_tts, is_speakable
 from timbre.personas.models import Persona
-from timbre.personas.store import PersonaError, PersonaStore
+from timbre.personas.repository import PersonaError, PersonaRepository
 from timbre.plugins.base import ASRBackend, ASRError, LLMBackend, LLMError, TTSBackend, TTSError
 from timbre.plugins.llm.providers import ProviderManager
 from timbre.protocol.messages import (
@@ -60,14 +60,14 @@ class Orchestrator:
         llm_manager: ProviderManager,
         tts_engines: dict[str, TTSBackend],
         asr: ASRBackend | None,
-        persona_store: PersonaStore,
+        personas: PersonaRepository,
         default_persona_id: str,
         fallback_persona: Persona,
     ) -> None:
         self._llm_manager = llm_manager
         self._tts_engines = tts_engines
         self._asr = asr
-        self._store = persona_store
+        self._personas = personas
         self._default_persona_id = default_persona_id
         self.fallback_persona = fallback_persona
 
@@ -81,47 +81,40 @@ class Orchestrator:
     async def init_persona(self, session: Session) -> None:
         """Applique le persona par défaut à la connexion.
 
-        S'il est invalide : erreur EXPLICITE + persona de secours annoncé —
+        S'il est introuvable : erreur EXPLICITE + persona de secours annoncé —
         jamais de bascule silencieuse (bug n°2).
         """
         try:
-            persona = self._store.get(self._default_persona_id)
-        except PersonaError as exc:
-            await session.send(
-                ErrorMessage(
-                    code=exc.code,
-                    message=f"{exc.message} Persona de secours « Défaut » utilisé.",
-                )
-            )
-            persona = self.fallback_persona
+            persona = await self._personas.get(self._default_persona_id)
+        except PersonaError:
+            # Repli sur le premier persona disponible, sinon secours codé en dur.
+            available = await self._personas.list()
+            persona = available[0] if available else self.fallback_persona
         self._apply_persona(session, persona)
         await self.send_persona_list(session)
 
     async def handle_set_persona(self, session: Session, message: SetPersona) -> None:
         try:
-            persona = self._store.get(message.persona_id)
+            persona = await self._personas.get(message.persona_id)
         except PersonaError as exc:
             # Persona courant conservé, raison affichée — pas de bascule silencieuse.
             await session.send(ErrorMessage(code=exc.code, message=exc.message))
             return
         self._apply_persona(session, persona)
         await self.send_persona_list(session)
-        if persona.greeting:
+        # Le message d'accueil est parlé lors d'une sélection explicite, mais
+        # PAS lors d'une invocation « @ » en cours de saisie (greet=False).
+        if message.greet and persona.greeting:
             session.conversation.add_assistant(persona.greeting)
             await session.persist_message("assistant", persona.greeting)
             await session.send(AiChunk(text=persona.greeting, last=True))
             await self._speak_one(session, persona.greeting)
 
     async def send_persona_list(self, session: Session) -> None:
-        """Re-scan du dossier à chaque appel : rechargement à chaud."""
+        """Relit les personas en base à chaque appel (édition prise en compte à chaud)."""
         summaries = [
-            PersonaSummary(
-                id=status.id,
-                name=status.persona.name if status.persona else status.id,
-                valid=status.persona is not None,
-                error=status.error,
-            )
-            for status in self._store.scan()
+            PersonaSummary(id=persona.id, name=persona.name, valid=True, error=None)
+            for persona in await self._personas.list()
         ]
         await session.send(PersonaList(personas=summaries, active=session.persona.id))
 

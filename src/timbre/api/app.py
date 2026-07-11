@@ -13,7 +13,7 @@ from timbre.api.ws import router as ws_router
 from timbre.config import Settings
 from timbre.core.orchestrator import Orchestrator
 from timbre.personas.models import Persona, VoiceConfig
-from timbre.personas.store import PersonaStore
+from timbre.personas.repository import PersonaRepository
 from timbre.plugins.asr.whisper import FasterWhisperASR
 from timbre.plugins.base import ASRBackend, LLMBackend, TTSBackend
 from timbre.plugins.llm.providers import ProviderManager
@@ -51,10 +51,6 @@ def create_app(
         )
     )
 
-    persona_store = PersonaStore(
-        Path(app_settings.personas_dir),
-        known_engines=set(tts_engines) if tts_engines else None,
-    )
     fallback_persona = Persona(
         id="defaut",
         name="Défaut",
@@ -64,6 +60,7 @@ def create_app(
 
     storage = Storage(Path(app_settings.database_path))
     llm_manager = ProviderManager(storage, app_settings, override=llm)
+    personas = PersonaRepository(storage)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -88,7 +85,7 @@ def create_app(
         llm_manager=llm_manager,
         tts_engines=tts_engines,
         asr=asr_backend,
-        persona_store=persona_store,
+        personas=personas,
         default_persona_id=app_settings.persona,
         fallback_persona=fallback_persona,
     )
