@@ -3,14 +3,16 @@ import { api, type ConversationMeta } from "./api";
 import { AudioQueue } from "./audio";
 import { ChatThread, type ChatMessage } from "./components/ChatThread";
 import { Composer } from "./components/Composer";
-import { PersonaSelect } from "./components/PersonaSelect";
 import { SettingsView } from "./components/SettingsView";
 import { Sidebar } from "./components/Sidebar";
-import { StateIndicator } from "./components/StateIndicator";
 import { MicController } from "./mic";
 import type { AppState, PersonaSummary, ServerMessage, TurnMetrics } from "./protocol";
 import { ScreenShare } from "./screen";
 import { TimbreSocket, WS_BASE, type ConnectionStatus } from "./ws";
+import { VoiceAgentBar } from "./components/VoiceAgentBar";
+
+
+
 
 export default function App() {
   const [view, setView] = useState<"chat" | "settings">("chat");
@@ -20,7 +22,6 @@ export default function App() {
 
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [appState, setAppState] = useState<AppState>("idle");
-  const [modelName, setModelName] = useState<string | null>(null);
   const [micOn, setMicOn] = useState(false);
   const [screenOn, setScreenOn] = useState(false);
   const [ttsPlaying, setTtsPlaying] = useState(false);
@@ -30,6 +31,9 @@ export default function App() {
   const [asrDevice, setAsrDevice] = useState<string | null>(null);
   const [language, setLanguage] = useState("fr");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [voiceModeActive, setVoiceModeActive] = useState(false);
+  const [settingCategory, setSettingCategory] = useState<"interface" | "providers" | "personas" | "diagnostic">("interface");
+
 
   const socketRef = useRef<TimbreSocket | null>(null);
   const micRef = useRef<MicController | null>(null);
@@ -98,6 +102,17 @@ export default function App() {
     };
   }, [append]);
 
+  useEffect(() => {
+    if (micRef.current) {
+      if (voiceModeActive) {
+        void micRef.current.setStatus(true);
+      } else {
+        void micRef.current.setStatus(false);
+      }
+    }
+  }, [voiceModeActive]);
+
+
   // ── Amorçage : conversations + réglages ─────────────────────────────────
   useEffect(() => {
     // Garde StrictMode : l'effet ne doit créer la conversation qu'une fois.
@@ -146,12 +161,16 @@ export default function App() {
           if (message.state === "idle") void refreshConversations().catch(() => undefined);
           break;
         case "model_info":
-          setModelName(message.model);
           break;
-        case "persona_list":
-          setPersonas(message.personas);
+        case "persona_list": {
+          const filtered = message.personas.filter((p) => p.id !== "defaut");
+          setPersonas([
+            { id: "defaut", name: "Aucun", valid: true, error: null },
+            ...filtered,
+          ]);
           setActivePersona(message.active);
           break;
+        }
         case "turn_metrics":
           setMetrics(message);
           break;
@@ -184,6 +203,9 @@ export default function App() {
           });
           break;
         case "error":
+          if (message.code === "persona_not_found" && message.message.includes("defaut")) {
+            break;
+          }
           append({ role: "error", text: `${message.code} — ${message.message}` });
           break;
       }
@@ -202,9 +224,9 @@ export default function App() {
   }, [activeId, append, refreshConversations]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
-  const sendUserMessage = (text: string) => {
+  const sendUserMessage = (text: string, uploadedImage?: string | null) => {
     const screen = screenRef.current;
-    const image = screen !== null && screen.isOn ? screen.captureFrame() : null;
+    const image = uploadedImage || (screen !== null && screen.isOn ? screen.captureFrame() : null);
     const sent =
       socketRef.current?.send({
         type: "user_message",
@@ -218,6 +240,26 @@ export default function App() {
       ]);
     }
   };
+
+  const reloadPersonas = useCallback(async () => {
+    try {
+      const list = await api.listPersonas();
+      const summaries: PersonaSummary[] = [
+        { id: "defaut", name: "Aucun", valid: true, error: null },
+        ...list.map((p) => ({ id: p.id, name: p.name, valid: true, error: null })),
+      ];
+      setPersonas(summaries);
+    } catch (error) {
+      console.error("Failed to reload personas:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (view === "chat") {
+      void reloadPersonas();
+    }
+  }, [view, reloadPersonas]);
+
 
   const stopTurn = () => {
     audioRef.current?.stop();
@@ -249,16 +291,17 @@ export default function App() {
       .catch((error: unknown) => append({ role: "error", text: String(error) }));
   };
 
-  const renameActive = () => {
-    const current = conversations.find((c) => c.id === activeId);
-    if (current === undefined || activeId === null) return;
+  const renameConversation = (id: string) => {
+    const current = conversations.find((c) => c.id === id);
+    if (current === undefined) return;
     const title = window.prompt("Titre de la conversation :", current.title);
     if (title === null || title.trim() === "") return;
     void api
-      .renameConversation(activeId, title.trim())
+      .renameConversation(id, title.trim())
       .then(() => refreshConversations())
       .catch((error: unknown) => append({ role: "error", text: String(error) }));
   };
+
 
   const changeLanguage = (value: string) => {
     setLanguage(value);
@@ -267,16 +310,19 @@ export default function App() {
     );
   };
 
-  // État affiché : « Parle » suit la lecture audio réelle côté client ;
-  // « En écoute » = micro ouvert et rien en cours.
   const displayState: AppState = ttsPlaying
     ? "speaking"
     : appState === "idle" && micOn
       ? "listening"
       : appState;
   const canStop = ttsPlaying || appState === "thinking" || appState === "speaking";
-  const activeTitle = conversations.find((c) => c.id === activeId)?.title ?? "";
-  const personaName = personas.find((p) => p.id === activePersona)?.name ?? "Timbre";
+  // « Aucun » = comportement par défaut : les réponses restent signées Timbre.
+  const personaName =
+    activePersona === "defaut"
+      ? "Timbre"
+      : (personas.find((p) => p.id === activePersona)?.name ?? "Timbre");
+
+
 
   return (
     <div className="shell">
@@ -284,7 +330,6 @@ export default function App() {
         conversations={conversations}
         activeId={activeId}
         filter={filter}
-        status={status}
         onFilterChange={setFilter}
         onSelect={(id) => {
           setActiveId(id);
@@ -292,7 +337,12 @@ export default function App() {
         }}
         onNew={newConversation}
         onDelete={deleteConversation}
+        onRename={renameConversation}
+        view={view}
         onOpenSettings={() => setView("settings")}
+        onBackToChat={() => setView("chat")}
+        activeSettingCategory={settingCategory}
+        onSelectSettingCategory={setSettingCategory}
       />
 
       {view === "settings" ? (
@@ -301,51 +351,103 @@ export default function App() {
           metrics={metrics}
           asrDevice={asrDevice}
           disabled={status !== "connected"}
+          category={settingCategory}
           onLanguageChange={changeLanguage}
           onSetAsrDevice={(device) => socketRef.current?.send({ type: "set_asr_device", device })}
-          onBack={() => setView("chat")}
         />
       ) : (
-        <div className="chat">
-          <header className="topbar">
-            <button
-              type="button"
-              className="topbar-title"
-              onClick={renameActive}
-              title="Renommer la conversation"
-            >
-              {activeTitle}
-            </button>
-            <StateIndicator state={displayState} />
-            <div className="topbar-right">
-              <PersonaSelect
-                personas={personas}
-                active={activePersona}
-                disabled={status !== "connected"}
-                onSelect={(id) => socketRef.current?.send({ type: "set_persona", persona_id: id })}
-                onRefresh={() => socketRef.current?.send({ type: "list_personas" })}
-              />
-              {modelName !== null && <span className="model-badge">{modelName}</span>}
+        <div className={`chat ${messages.length === 0 ? "chat--empty" : ""} ${voiceModeActive ? "chat--voice-active" : ""}`}>
+          {messages.length > 0 ? (
+            <>
+              <ChatThread messages={messages} persona={personaName} />
+              <div className="composer-zone">
+                {voiceModeActive ? (
+                  <VoiceAgentBar
+                    micOn={micOn}
+                    screenOn={screenOn}
+                    state={displayState}
+                    personas={personas}
+                    activePersona={activePersona}
+                    onToggleMic={() => void micRef.current?.toggle()}
+                    onToggleScreen={() => void screenRef.current?.toggle()}
+                    onInvokePersona={(id) =>
+                      socketRef.current?.send({ type: "set_persona", persona_id: id, greet: false })
+                    }
+                    onClose={() => setVoiceModeActive(false)}
+                  />
+                ) : (
+                  <Composer
+                    disabled={status !== "connected"}
+                    micOn={micOn}
+                    canStop={canStop}
+                    onToggleMic={() => void micRef.current?.toggle()}
+                    onStop={stopTurn}
+                    onSend={sendUserMessage}
+                    onToggleVoiceAgent={() => setVoiceModeActive(true)}
+                  />
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="chat-empty-container">
+              <h1 className="chat-empty-title">Comment puis-je vous aider aujourd'hui ?</h1>
+              <div className="composer-zone">
+                {voiceModeActive ? (
+                  <VoiceAgentBar
+                    micOn={micOn}
+                    screenOn={screenOn}
+                    state={displayState}
+                    personas={personas}
+                    activePersona={activePersona}
+                    onToggleMic={() => void micRef.current?.toggle()}
+                    onToggleScreen={() => void screenRef.current?.toggle()}
+                    onInvokePersona={(id) =>
+                      socketRef.current?.send({ type: "set_persona", persona_id: id, greet: false })
+                    }
+                    onClose={() => setVoiceModeActive(false)}
+                  />
+                ) : (
+                  <Composer
+                    disabled={status !== "connected"}
+                    micOn={micOn}
+                    canStop={canStop}
+                    onToggleMic={() => void micRef.current?.toggle()}
+                    onStop={stopTurn}
+                    onSend={sendUserMessage}
+                    onToggleVoiceAgent={() => setVoiceModeActive(true)}
+                  />
+                )}
+              </div>
+              {!voiceModeActive && (
+                <div className="suggestion-pills">
+                  <button
+                    type="button"
+                    className="suggestion-pill"
+                    onClick={() => sendUserMessage("Enregistrer une réunion")}
+                  >
+                    Enregistrer une réunion
+                  </button>
+                  <button
+                    type="button"
+                    className="suggestion-pill"
+                    onClick={() => sendUserMessage("Modifier l'espace de travail")}
+                  >
+                    Modifier l'espace de travail
+                  </button>
+                  <button
+                    type="button"
+                    className="suggestion-pill"
+                    onClick={() => sendUserMessage("Télécharger un document")}
+                  >
+                    Télécharger un document
+                  </button>
+                </div>
+              )}
             </div>
-          </header>
-          <ChatThread messages={messages} persona={personaName} />
-          <div className="composer-zone">
-            <Composer
-              disabled={status !== "connected"}
-              micOn={micOn}
-              screenOn={screenOn}
-              canStop={canStop}
-              personas={personas}
-              onToggleMic={() => void micRef.current?.toggle()}
-              onToggleScreen={() => void screenRef.current?.toggle()}
-              onStop={stopTurn}
-              onSend={sendUserMessage}
-              onInvokePersona={(id) =>
-                socketRef.current?.send({ type: "set_persona", persona_id: id, greet: false })
-              }
-            />
-          </div>
+          )}
         </div>
+
+
       )}
     </div>
   );

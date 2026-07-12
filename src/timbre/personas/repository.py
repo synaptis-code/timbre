@@ -20,13 +20,16 @@ class PersonaError(Exception):
 
 
 class PersonaRepository:
-    def __init__(self, storage: Storage) -> None:
+    def __init__(self, storage: Storage, fallback: Persona | None = None) -> None:
         self._storage = storage
+        self._fallback = fallback
 
     async def list(self) -> list[Persona]:
         return await self._storage.list_personas()
 
     async def get(self, persona_id: str) -> Persona:
+        if persona_id == "defaut" and self._fallback is not None:
+            return self._fallback
         persona = await self._storage.get_persona(persona_id)
         if persona is None:
             raise PersonaError("persona_not_found", f"Persona « {persona_id} » introuvable.")

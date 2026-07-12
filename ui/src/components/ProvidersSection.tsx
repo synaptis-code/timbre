@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type ProviderInfo, type ProvidersState } from "../api";
 import { ProviderLogo } from "../providerLogos";
+import { ChevronDownIcon } from "../icons";
+
 
 /** Réglages → Fournisseur d'IA (façon AnythingLLM) : un sélecteur avec liste
  * recherchable + logos, puis un formulaire dont les champs dépendent du
@@ -103,7 +105,6 @@ export function ProvidersSection() {
         const next = await api.setActiveProvider(selected.id);
         setState(next);
         setApiKey("");
-        setFeedback({ kind: "ok", text: `${selected.name} est maintenant ton fournisseur d'IA.` });
       } catch (error) {
         setFeedback({
           kind: "error",
@@ -267,11 +268,18 @@ function ProviderPicker({ state, selected, open, search, onToggle, onSearch, onP
       <button type="button" className="provider-card-btn" onClick={onToggle} aria-expanded={open}>
         <ProviderLogo id={selected.id} />
         <span className="provider-card-text">
-          <strong>{selected.name}</strong>
+          <strong>
+            {selected.name}
+            {selected.id === state.active && (
+              <span className="provider-tag" style={{ marginLeft: "8px" }}>
+                actif
+              </span>
+            )}
+          </strong>
           <span>{selected.description}</span>
         </span>
         <span className="provider-card-chevron" aria-hidden="true">
-          ⌄
+          <ChevronDownIcon size={14} />
         </span>
       </button>
 

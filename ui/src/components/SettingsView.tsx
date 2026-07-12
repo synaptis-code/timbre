@@ -1,27 +1,18 @@
-import { useState } from "react";
-import { BackIcon } from "../icons";
 import type { TurnMetrics } from "../protocol";
 import { PersonasSection } from "./PersonasSection";
 import { ProvidersSection } from "./ProvidersSection";
+
+type Category = "interface" | "providers" | "personas" | "diagnostic";
 
 interface SettingsViewProps {
   language: string;
   metrics: TurnMetrics | null;
   asrDevice: string | null;
   disabled: boolean;
+  category: Category;
   onLanguageChange: (language: string) => void;
   onSetAsrDevice: (device: "cuda" | "cpu") => void;
-  onBack: () => void;
 }
-
-type Category = "interface" | "providers" | "personas" | "diagnostic";
-
-const CATEGORIES: ReadonlyArray<readonly [Category, string]> = [
-  ["interface", "Interface"],
-  ["providers", "Fournisseur d'IA"],
-  ["personas", "Personas"],
-  ["diagnostic", "Diagnostic"],
-];
 
 const LANGUAGES = [
   ["fr", "Français"],
@@ -38,33 +29,12 @@ export function SettingsView({
   metrics,
   asrDevice,
   disabled,
+  category,
   onLanguageChange,
   onSetAsrDevice,
-  onBack,
 }: SettingsViewProps) {
-  const [category, setCategory] = useState<Category>("interface");
-
   return (
     <div className="settings-layout">
-      <nav className="settings-nav" aria-label="Catégories de réglages">
-        <button type="button" className="btn-ghost settings-nav-back" onClick={onBack}>
-          <BackIcon size={16} />
-          Retour
-        </button>
-        <p className="eyebrow settings-nav-eyebrow">Réglages</p>
-        {CATEGORIES.map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            className={`settings-nav-item ${category === id ? "settings-nav-item--active" : ""}`}
-            onClick={() => setCategory(id)}
-            aria-current={category === id ? "page" : undefined}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
-
       <div className="settings-content">
         {category === "interface" && (
           <>

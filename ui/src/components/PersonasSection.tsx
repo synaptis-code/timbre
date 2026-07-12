@@ -49,6 +49,33 @@ export function PersonasSection() {
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((prev) => (prev === null ? prev : { ...prev, [key]: value }));
 
+  const isDirty = () => {
+    if (draft === null) return false;
+    if (draft.id === null) {
+      return (
+        draft.name !== EMPTY.name ||
+        draft.system_prompt !== EMPTY.system_prompt ||
+        draft.voice_id !== EMPTY.voice_id ||
+        draft.rate !== EMPTY.rate ||
+        draft.pitch !== EMPTY.pitch ||
+        draft.greeting !== EMPTY.greeting ||
+        draft.temperature !== EMPTY.temperature
+      );
+    }
+    const original = personas.find((p) => p.id === draft.id);
+    if (!original) return false;
+    const base = toDraft(original);
+    return (
+      draft.name !== base.name ||
+      draft.system_prompt !== base.system_prompt ||
+      draft.voice_id !== base.voice_id ||
+      draft.rate !== base.rate ||
+      draft.pitch !== base.pitch ||
+      draft.greeting !== base.greeting ||
+      draft.temperature !== base.temperature
+    );
+  };
+
   const save = () => {
     if (draft === null) return;
     const { id, ...payload } = draft;
@@ -59,7 +86,6 @@ export function PersonasSection() {
       .then(async () => {
         await load();
         setDraft(null);
-        setFeedback({ kind: "ok", text: "Persona enregistré." });
       })
       .catch((error: unknown) =>
         setFeedback({
@@ -88,7 +114,7 @@ export function PersonasSection() {
       <>
         <h1 className="settings-title">{draft.id === null ? "Nouveau persona" : "Modifier"}</h1>
         <p className="settings-subtitle">
-          Sa personnalité, sa voix et son message d'accueil. Il sera invocable avec «&nbsp;@&nbsp;».
+          Sa personnalité, sa voix et son message d'accueil.
         </p>
         <div className="persona-editor">
           <label className="provider-field">
@@ -171,7 +197,7 @@ export function PersonasSection() {
               type="button"
               className="btn-primary"
               onClick={save}
-              disabled={busy || draft.name.trim() === ""}
+              disabled={busy || draft.name.trim() === "" || !isDirty()}
             >
               Enregistrer
             </button>
@@ -190,7 +216,7 @@ export function PersonasSection() {
         <div>
           <h1 className="settings-title">Personas</h1>
           <p className="settings-subtitle">
-            Crée des personnalités avec leur voix. Invoque-les dans le chat avec «&nbsp;@&nbsp;».
+            Crée des personnalités avec leur voix.
           </p>
         </div>
         <button type="button" className="btn-primary" onClick={() => setDraft({ ...EMPTY })}>

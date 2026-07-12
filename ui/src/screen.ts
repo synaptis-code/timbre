@@ -36,6 +36,12 @@ export class ScreenShare {
     try {
       stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
     } catch (error) {
+      const isNotAllowed =
+        (error instanceof DOMException && error.name === "NotAllowedError") ||
+        (error instanceof Error && error.name === "NotAllowedError");
+      if (isNotAllowed) {
+        return;
+      }
       this.handlers.onError(
         `Partage d'écran impossible : ${error instanceof Error ? error.message : String(error)}`,
       );

@@ -60,7 +60,7 @@ def create_app(
 
     storage = Storage(Path(app_settings.database_path))
     llm_manager = ProviderManager(storage, app_settings, override=llm)
-    personas = PersonaRepository(storage)
+    personas = PersonaRepository(storage, fallback=fallback_persona)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:

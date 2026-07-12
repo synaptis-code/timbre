@@ -119,6 +119,22 @@ def test_set_unknown_persona_keeps_current(tmp_path: Path):
         assert error["type"] == "error" and error["code"] == "persona_not_found"
 
 
+def test_defaut_selects_fallback_persona_without_error(tmp_path: Path):
+    """« Aucun » dans l'UI = id virtuel « defaut » → persona de secours, jamais d'erreur."""
+    llm = FakeLLM(tokens=["Ok."])
+    with make_client(tmp_path, llm=llm) as client, client.websocket_connect("/ws") as ws:
+        receive_connect(ws)
+        ws.send_json({"type": "set_persona", "persona_id": "defaut", "greet": False})
+        updated = ws.receive_json()
+        assert updated["type"] == "persona_list"  # pas d'erreur persona_not_found
+        assert updated["active"] == "defaut"
+        # Le tour suivant utilise le prompt système par défaut, pas celui d'un persona.
+        ws.send_json({"type": "user_message", "text": "Salut"})
+        drain_until_idle(ws)
+    system_prompt = str(llm.received_messages[0][0]["content"])
+    assert "assistant vocal français" in system_prompt
+
+
 def test_cannot_delete_last_persona(tmp_path: Path):
     with make_client(tmp_path) as client:
         assert client.delete("/api/personas/timbre").status_code == 400

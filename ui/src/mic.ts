@@ -85,6 +85,13 @@ export class MicController {
         // Si l'init aboutit finalement après le timeout : pas de micro fantôme.
         vadPromise.then((vad) => vad.destroy()).catch(() => undefined);
         this.wantedOn = false;
+        const isNotAllowed =
+          (error instanceof DOMException && error.name === "NotAllowedError") ||
+          (error instanceof Error && (error.name === "NotAllowedError" || error.message.includes("Permission denied") || error.message.includes("Permission dismissed")));
+        if (isNotAllowed) {
+          this.handlers.onStatus(false);
+          return;
+        }
         this.handlers.onError(
           `Micro indisponible : ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -95,6 +102,11 @@ export class MicController {
     }
     this.vad.start();
     this.handlers.onStatus(true);
+  }
+
+  async setStatus(on: boolean): Promise<void> {
+    if (this.wantedOn === on) return;
+    await this.toggle();
   }
 
   destroy(): void {
