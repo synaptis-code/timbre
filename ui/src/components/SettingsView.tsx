@@ -1,8 +1,8 @@
 import type { TurnMetrics } from "../protocol";
+import { FeedbackSection } from "./FeedbackSection";
 import { PersonasSection } from "./PersonasSection";
 import { ProvidersSection } from "./ProvidersSection";
-
-type Category = "interface" | "providers" | "personas" | "diagnostic";
+import type { SettingsCategory as Category } from "./Sidebar";
 
 interface SettingsViewProps {
   language: string;
@@ -65,6 +65,50 @@ export function SettingsView({
         {category === "providers" && <ProvidersSection />}
 
         {category === "personas" && <PersonasSection />}
+
+        {category === "support" && (
+          <>
+            <h1 className="settings-title">Soutenir Timbre</h1>
+            <p className="settings-subtitle">
+              Timbre est gratuit, open source et local d'abord. Le meilleur moyen de le
+              soutenir&nbsp;: une étoile sur GitHub et un peu de bouche-à-oreille.
+            </p>
+            <section className="color-block color-block--lime">
+              <p className="eyebrow">Open source</p>
+              <h2 className="color-block-title">Mets une étoile au projet</h2>
+              <p className="color-block-body">
+                Chaque étoile aide Timbre à être découvert par d'autres personnes qui
+                cherchent un assistant vocal qui respecte leur vie privée. Tu peux aussi
+                partager le projet, ouvrir des issues, ou contribuer au code.
+              </p>
+              <a
+                className="btn-primary"
+                href="https://github.com/synaptis-code/timbre"
+                target="_blank"
+                rel="noreferrer"
+              >
+                ⭐ Star sur GitHub
+              </a>
+            </section>
+            <section className="settings-card">
+              <h2 className="settings-card-title">Créé par Synaptis</h2>
+              <p className="settings-hint" style={{ marginBottom: 14 }}>
+                Timbre est conçu et développé par l'agence Synaptis — création d'outils et
+                d'expériences IA.
+              </p>
+              <a
+                className="btn-secondary"
+                href="https://www.synaptis.agency"
+                target="_blank"
+                rel="noreferrer"
+              >
+                www.synaptis.agency
+              </a>
+            </section>
+          </>
+        )}
+
+        {category === "feedback" && <FeedbackSection />}
 
         {category === "diagnostic" && (
           <>

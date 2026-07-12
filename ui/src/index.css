@@ -1315,6 +1315,62 @@ body {
   color: var(--magenta);
 }
 
+/* — Soutenir & Contact — */
+a.btn-primary,
+a.btn-secondary {
+  text-decoration: none;
+  width: fit-content;
+}
+
+.feedback-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 560px;
+}
+
+.feedback-kinds {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.feedback-kind {
+  background: var(--canvas);
+  color: var(--ink);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-pill);
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 480;
+  cursor: pointer;
+}
+
+/* Sélection = surface primaire (signature du système) */
+.feedback-kind--on {
+  background: var(--ink);
+  color: var(--canvas);
+  border-color: var(--ink);
+}
+
+.feedback-message {
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 400;
+  color: var(--ink);
+  background: var(--canvas);
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.feedback-message:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+
 /* — Personas — */
 .settings-head-row {
   display: flex;

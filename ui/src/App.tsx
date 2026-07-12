@@ -4,7 +4,7 @@ import { AudioQueue } from "./audio";
 import { ChatThread, type ChatMessage } from "./components/ChatThread";
 import { Composer } from "./components/Composer";
 import { SettingsView } from "./components/SettingsView";
-import { Sidebar } from "./components/Sidebar";
+import { Sidebar, type SettingsCategory } from "./components/Sidebar";
 import { MicController } from "./mic";
 import type { AppState, PersonaSummary, ServerMessage, TurnMetrics } from "./protocol";
 import { ScreenShare } from "./screen";
@@ -32,7 +32,7 @@ export default function App() {
   const [language, setLanguage] = useState("fr");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [voiceModeActive, setVoiceModeActive] = useState(false);
-  const [settingCategory, setSettingCategory] = useState<"interface" | "providers" | "personas" | "diagnostic">("interface");
+  const [settingCategory, setSettingCategory] = useState<SettingsCategory>("interface");
 
 
   const socketRef = useRef<TimbreSocket | null>(null);

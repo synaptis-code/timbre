@@ -23,15 +23,25 @@ interface SidebarProps {
   view: "chat" | "settings";
   onOpenSettings: () => void;
   onBackToChat: () => void;
-  activeSettingCategory: "interface" | "providers" | "personas" | "diagnostic";
-  onSelectSettingCategory: (category: "interface" | "providers" | "personas" | "diagnostic") => void;
+  activeSettingCategory: SettingsCategory;
+  onSelectSettingCategory: (category: SettingsCategory) => void;
 }
 
-const SETTINGS_CATEGORIES: ReadonlyArray<readonly ["interface" | "providers" | "personas" | "diagnostic", string]> = [
+export type SettingsCategory =
+  | "interface"
+  | "providers"
+  | "personas"
+  | "diagnostic"
+  | "support"
+  | "feedback";
+
+const SETTINGS_CATEGORIES: ReadonlyArray<readonly [SettingsCategory, string]> = [
   ["interface", "Interface"],
   ["providers", "Fournisseur d'IA"],
   ["personas", "Personas"],
   ["diagnostic", "Diagnostic"],
+  ["support", "Soutenir"],
+  ["feedback", "Contact"],
 ];
 
 export function Sidebar({
