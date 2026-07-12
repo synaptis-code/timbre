@@ -39,6 +39,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export interface ProviderInfo {
   id: string;
   name: string;
+  description: string;
   local: boolean;
   needs_key: boolean;
   base_url: string;
@@ -98,8 +99,11 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ provider: id }),
     }),
-  listProviderModels: (id: string) =>
-    request<{ models: string[] }>(`/api/providers/${id}/models`),
+  listProviderModels: (id: string, override?: { api_key?: string; base_url?: string }) =>
+    request<{ models: string[] }>(`/api/providers/${id}/models`, {
+      method: "POST",
+      body: JSON.stringify(override ?? {}),
+    }),
   listPersonas: () => request<Persona[]>("/api/personas"),
   createPersona: (payload: PersonaPayload) =>
     request<Persona>("/api/personas", { method: "POST", body: JSON.stringify(payload) }),

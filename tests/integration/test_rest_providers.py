@@ -26,6 +26,7 @@ def test_defaults_to_lmstudio_with_full_catalog(tmp_path: Path):
         assert {"lmstudio", "ollama", "openai", "anthropic", "gemini", "deepseek"} <= ids
         lmstudio = next(p for p in state["providers"] if p["id"] == "lmstudio")
         assert lmstudio["local"] is True and lmstudio["needs_key"] is False
+        assert lmstudio["description"]  # chaque fournisseur porte une description
 
 
 def test_configure_and_activate_provider(tmp_path: Path):
@@ -62,7 +63,7 @@ def test_unknown_provider_is_404(tmp_path: Path):
     with make_client(tmp_path) as client:
         assert client.put("/api/providers/active", json={"provider": "skynet"}).status_code == 404
         assert client.put("/api/providers/skynet", json={}).status_code == 404
-        assert client.get("/api/providers/skynet/models").status_code == 404
+        assert client.post("/api/providers/skynet/models", json={}).status_code == 404
 
 
 def test_local_provider_without_key_can_activate_with_model(tmp_path: Path):

@@ -76,6 +76,7 @@ async def list_messages(request: Request, conversation_id: str) -> list[StoredMe
 class ProviderInfo(BaseModel):
     id: str
     name: str
+    description: str
     local: bool
     needs_key: bool
     base_url: str
@@ -98,6 +99,7 @@ async def _providers_state(request: Request) -> ProvidersState:
             ProviderInfo(
                 id=spec.id,
                 name=spec.name,
+                description=spec.description,
                 local=spec.local,
                 needs_key=spec.needs_key,
                 base_url=base_url,
@@ -160,16 +162,31 @@ async def update_provider(
     return await _providers_state(request)
 
 
+class ModelsQuery(BaseModel):
+    """Config ad-hoc pour lister les modèles sans la persister (clé jamais en URL)."""
+
+    api_key: str | None = None
+    base_url: str | None = None
+
+
 class ModelsResponse(BaseModel):
     models: list[str]
 
 
-@router.get("/providers/{provider_id}/models")
-async def list_provider_models(request: Request, provider_id: str) -> ModelsResponse:
+@router.post("/providers/{provider_id}/models")
+async def list_provider_models(
+    request: Request, provider_id: str, query: ModelsQuery | None = None
+) -> ModelsResponse:
     if provider_id not in SPECS_BY_ID:
         raise HTTPException(status_code=404, detail=f"Fournisseur inconnu : {provider_id}")
+    payload = query or ModelsQuery()
     try:
-        return ModelsResponse(models=await _manager(request).list_models(provider_id))
+        models = await _manager(request).list_models(
+            provider_id,
+            api_key=payload.api_key or None,
+            base_url=payload.base_url or None,
+        )
+        return ModelsResponse(models=models)
     except LLMError as exc:
         raise HTTPException(status_code=502, detail=exc.message) from exc
 

@@ -29,15 +29,64 @@ class ProviderSpec:
     default_base_url: str
     needs_key: bool
     local: bool
+    description: str
 
 
 PROVIDERS: tuple[ProviderSpec, ...] = (
-    ProviderSpec("lmstudio", "LM Studio", "lmstudio", "http://127.0.0.1:1234", False, True),
-    ProviderSpec("ollama", "Ollama", "openai", "http://127.0.0.1:11434/v1", False, True),
-    ProviderSpec("localai", "LocalAI", "openai", "http://127.0.0.1:8080/v1", False, True),
-    ProviderSpec("lemonade", "Lemonade", "openai", "http://127.0.0.1:8000/api/v1", False, True),
-    ProviderSpec("openai", "OpenAI", "openai", "https://api.openai.com/v1", True, False),
-    ProviderSpec("anthropic", "Anthropic", "anthropic", "https://api.anthropic.com", True, False),
+    ProviderSpec(
+        "lmstudio",
+        "LM Studio",
+        "lmstudio",
+        "http://127.0.0.1:1234",
+        False,
+        True,
+        "Découvre, télécharge et lance des LLM locaux en quelques clics.",
+    ),
+    ProviderSpec(
+        "ollama",
+        "Ollama",
+        "openai",
+        "http://127.0.0.1:11434/v1",
+        False,
+        True,
+        "Lance des modèles locaux (Llama, Mistral…) sur ta machine.",
+    ),
+    ProviderSpec(
+        "localai",
+        "LocalAI",
+        "openai",
+        "http://127.0.0.1:8080/v1",
+        False,
+        True,
+        "Serveur d'inférence local compatible OpenAI.",
+    ),
+    ProviderSpec(
+        "lemonade",
+        "Lemonade",
+        "openai",
+        "http://127.0.0.1:8000/api/v1",
+        False,
+        True,
+        "Serveur local accéléré (AMD Ryzen AI / GPU).",
+    ),
+    ProviderSpec(
+        "openai",
+        "OpenAI",
+        "openai",
+        "https://api.openai.com/v1",
+        True,
+        False,
+        "GPT-4o, GPT-4.1 et compagnie — le choix standard.",
+    ),
+    ProviderSpec(
+        "anthropic",
+        "Anthropic",
+        "anthropic",
+        "https://api.anthropic.com",
+        True,
+        False,
+        "Claude, un assistant IA sûr et de qualité.",
+    ),
     ProviderSpec(
         "gemini",
         "Google Gemini",
@@ -45,21 +94,106 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         "https://generativelanguage.googleapis.com/v1beta/openai",
         True,
         False,
+        "Les modèles Gemini de Google.",
     ),
-    ProviderSpec("nim", "NVIDIA NIM", "openai", "https://integrate.api.nvidia.com/v1", True, False),
-    ProviderSpec("together", "Together AI", "openai", "https://api.together.xyz/v1", True, False),
-    ProviderSpec("deepseek", "DeepSeek", "openai", "https://api.deepseek.com/v1", True, False),
-    ProviderSpec("groq", "Groq", "openai", "https://api.groq.com/openai/v1", True, False),
-    ProviderSpec("mistral", "Mistral", "openai", "https://api.mistral.ai/v1", True, False),
-    ProviderSpec("openrouter", "OpenRouter", "openai", "https://openrouter.ai/api/v1", True, False),
-    ProviderSpec("xai", "xAI", "openai", "https://api.x.ai/v1", True, False),
-    ProviderSpec("perplexity", "Perplexity", "openai", "https://api.perplexity.ai", True, False),
     ProviderSpec(
-        "fireworks", "Fireworks AI", "openai", "https://api.fireworks.ai/inference/v1", True, False
+        "nim",
+        "NVIDIA NIM",
+        "openai",
+        "https://integrate.api.nvidia.com/v1",
+        True,
+        False,
+        "Microservices d'inférence NVIDIA.",
     ),
-    ProviderSpec("sambanova", "SambaNova", "openai", "https://api.sambanova.ai/v1", True, False),
     ProviderSpec(
-        "cohere", "Cohere", "openai", "https://api.cohere.ai/compatibility/v1", True, False
+        "together",
+        "Together AI",
+        "openai",
+        "https://api.together.xyz/v1",
+        True,
+        False,
+        "Modèles open source hébergés, rapides.",
+    ),
+    ProviderSpec(
+        "deepseek",
+        "DeepSeek",
+        "openai",
+        "https://api.deepseek.com/v1",
+        True,
+        False,
+        "Les modèles DeepSeek (chat et raisonnement).",
+    ),
+    ProviderSpec(
+        "groq",
+        "Groq",
+        "openai",
+        "https://api.groq.com/openai/v1",
+        True,
+        False,
+        "Inférence ultra-rapide sur LPU.",
+    ),
+    ProviderSpec(
+        "mistral",
+        "Mistral",
+        "openai",
+        "https://api.mistral.ai/v1",
+        True,
+        False,
+        "Les modèles de Mistral AI.",
+    ),
+    ProviderSpec(
+        "openrouter",
+        "OpenRouter",
+        "openai",
+        "https://openrouter.ai/api/v1",
+        True,
+        False,
+        "Un seul point d'accès vers des centaines de modèles.",
+    ),
+    ProviderSpec(
+        "xai",
+        "xAI",
+        "openai",
+        "https://api.x.ai/v1",
+        True,
+        False,
+        "Les modèles Grok de xAI.",
+    ),
+    ProviderSpec(
+        "perplexity",
+        "Perplexity",
+        "openai",
+        "https://api.perplexity.ai",
+        True,
+        False,
+        "Modèles Sonar connectés au web.",
+    ),
+    ProviderSpec(
+        "fireworks",
+        "Fireworks AI",
+        "openai",
+        "https://api.fireworks.ai/inference/v1",
+        True,
+        False,
+        "Inférence rapide pour modèles open source.",
+    ),
+    ProviderSpec(
+        "sambanova",
+        "SambaNova",
+        "openai",
+        "https://api.sambanova.ai/v1",
+        True,
+        False,
+        "Inférence très rapide sur puces dédiées.",
+    ),
+    ProviderSpec(
+        "cohere",
+        "Cohere",
+        "openai",
+        "https://api.cohere.ai/compatibility/v1",
+        True,
+        False,
+        "Les modèles Command de Cohere.",
     ),
 )
 
@@ -129,16 +263,26 @@ class ProviderManager:
         model = await self._storage.get_setting(config_key(spec.id, "model"), "") or None
         return base_url, api_key, model
 
-    async def list_models(self, provider_id: str) -> list[str]:
+    async def list_models(
+        self,
+        provider_id: str,
+        *,
+        api_key: str | None = None,
+        base_url: str | None = None,
+    ) -> list[str]:
+        """Liste les modèles. `api_key`/`base_url` fournis priment sur la config
+        stockée — permet de tester une clé fraîchement saisie sans la persister."""
         spec = SPECS_BY_ID.get(provider_id)
         if spec is None:
             raise LLMError("provider_unknown", f"Fournisseur inconnu : {provider_id}")
-        base_url, api_key, _model = await self.config(spec)
+        stored_base, stored_key, _model = await self.config(spec)
+        base = base_url or stored_base
+        key = api_key or stored_key
         if spec.kind == "anthropic":
-            return await fetch_anthropic_models(base_url, api_key or "")
+            return await fetch_anthropic_models(base, key or "")
         if spec.kind == "lmstudio":
-            return await fetch_lmstudio_models(base_url)
-        return await fetch_openai_models(base_url, api_key)
+            return await fetch_lmstudio_models(base)
+        return await fetch_openai_models(base, key)
 
     async def _build(self, spec: ProviderSpec) -> LLMBackend:
         base_url, api_key, model = await self.config(spec)
