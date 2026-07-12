@@ -1,50 +1,68 @@
-/** Logos des fournisseurs : tuiles générées par code (aucune image embarquée),
- * couleur de marque + monogramme — reconnaissables et fidèles à l'esprit épuré. */
+import {
+  siAnthropic,
+  siDeepseek,
+  siGooglegemini,
+  siLmstudio,
+  siMistralai,
+  siNvidia,
+  siOllama,
+  siOpenrouter,
+  siPerplexity,
+  siX,
+  type SimpleIcon,
+} from "simple-icons";
 
-interface LogoStyle {
-  bg: string;
-  fg: string;
-  mono: string;
-}
+/** Vrais logos de marque (simple-icons, CC0) là où ils existent ; pour les
+ * fournisseurs absents de la bibliothèque, une tuile monogramme sobre. */
 
-const LOGOS: Record<string, LogoStyle> = {
-  lmstudio: { bg: "#4f46e5", fg: "#fff", mono: "LM" },
-  ollama: { bg: "#111", fg: "#fff", mono: "OL" },
-  localai: { bg: "#2563eb", fg: "#fff", mono: "LA" },
-  lemonade: { bg: "#f4c430", fg: "#111", mono: "LE" },
-  openai: { bg: "#10a37f", fg: "#fff", mono: "AI" },
-  anthropic: { bg: "#d97757", fg: "#fff", mono: "A" },
-  gemini: { bg: "#1a73e8", fg: "#fff", mono: "G" },
-  nim: { bg: "#76b900", fg: "#111", mono: "NV" },
-  together: { bg: "#0f6fff", fg: "#fff", mono: "TA" },
-  deepseek: { bg: "#4d6bfe", fg: "#fff", mono: "DS" },
-  groq: { bg: "#f55036", fg: "#fff", mono: "GQ" },
-  mistral: { bg: "#fa5310", fg: "#fff", mono: "MI" },
-  openrouter: { bg: "#6467f2", fg: "#fff", mono: "OR" },
-  xai: { bg: "#111", fg: "#fff", mono: "xAI" },
-  perplexity: { bg: "#20808d", fg: "#fff", mono: "PP" },
-  fireworks: { bg: "#7c3aed", fg: "#fff", mono: "FW" },
-  sambanova: { bg: "#ee2a7b", fg: "#fff", mono: "SN" },
-  cohere: { bg: "#39594d", fg: "#fff", mono: "CO" },
+const ICONS: Record<string, SimpleIcon> = {
+  anthropic: siAnthropic,
+  gemini: siGooglegemini,
+  lmstudio: siLmstudio,
+  ollama: siOllama,
+  deepseek: siDeepseek,
+  mistral: siMistralai,
+  xai: siX,
+  openrouter: siOpenrouter,
+  perplexity: siPerplexity,
+  nim: siNvidia,
 };
 
-const FALLBACK: LogoStyle = { bg: "#666", fg: "#fff", mono: "?" };
+// Fournisseurs sans logo dans simple-icons : monogramme + couleur de marque.
+const MONO: Record<string, { text: string; color: string }> = {
+  openai: { text: "AI", color: "#10a37f" },
+  groq: { text: "groq", color: "#f55036" },
+  together: { text: "TA", color: "#0f6fff" },
+  fireworks: { text: "FW", color: "#7c3aed" },
+  localai: { text: "LA", color: "#2563eb" },
+  lemonade: { text: "LE", color: "#d4a017" },
+  sambanova: { text: "SN", color: "#ee2a7b" },
+  cohere: { text: "CO", color: "#39594d" },
+};
 
 export function ProviderLogo({ id, size = 34 }: { id: string; size?: number }) {
-  const style = LOGOS[id] ?? FALLBACK;
+  const icon = ICONS[id];
+  const mono = MONO[id] ?? { text: "?", color: "#666" };
   return (
-    <span
-      className="provider-logo"
-      aria-hidden="true"
-      style={{
-        width: size,
-        height: size,
-        background: style.bg,
-        color: style.fg,
-        fontSize: style.mono.length > 2 ? size * 0.32 : size * 0.4,
-      }}
-    >
-      {style.mono}
+    <span className="provider-logo" aria-hidden="true" style={{ width: size, height: size }}>
+      {icon !== undefined ? (
+        <svg
+          viewBox="0 0 24 24"
+          width={size * 0.58}
+          height={size * 0.58}
+          fill={`#${icon.hex}`}
+          role="img"
+        >
+          <path d={icon.path} />
+        </svg>
+      ) : (
+        <span
+          className="provider-logo-mono"
+          style={{ color: mono.color, fontSize: mono.text.length > 2 ? size * 0.28 : size * 0.4 }}
+        >
+          {mono.text}
+        </span>
+      )}
     </span>
   );
 }
