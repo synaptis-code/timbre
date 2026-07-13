@@ -1521,19 +1521,103 @@ a.btn-secondary {
   min-width: 0;
 }
 
-/* Liste des voix Piper téléchargeables */
-.piper-voices {
-  display: flex;
-  flex-direction: column;
-  margin-top: 4px;
-  border-top: 1px solid var(--hairline);
-}
-
 .piper-hint {
   font-size: 13px;
   opacity: 0.6;
   padding: 12px 0 2px;
   margin: 0;
+}
+
+.piper-load-error {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
+}
+
+/* Voix installées (« Vos voix ») + recherche + langues repliables */
+.piper-installed {
+  margin-top: 6px;
+  border-top: 1px solid var(--hairline);
+}
+
+.piper-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  opacity: 0.5;
+  margin: 12px 0 2px;
+}
+
+.piper-search {
+  width: 100%;
+  margin-top: 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-pill);
+  padding: 9px 16px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--canvas);
+}
+
+.piper-search:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+
+.piper-langs {
+  margin-top: 8px;
+}
+
+.piper-lang {
+  border-bottom: 1px solid var(--hairline);
+}
+
+.piper-lang-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 2px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.piper-lang-summary::-webkit-details-marker {
+  display: none;
+}
+
+.piper-lang-summary::before {
+  content: "▸";
+  font-size: 11px;
+  opacity: 0.5;
+  transition: transform 0.15s ease;
+}
+
+.piper-lang[open] > .piper-lang-summary::before {
+  transform: rotate(90deg);
+}
+
+.piper-lang-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.piper-lang-count {
+  font-size: 11px;
+  font-family: var(--mono);
+  opacity: 0.55;
+  background: var(--surface-soft);
+  border-radius: var(--r-pill);
+  padding: 2px 9px;
+}
+
+.piper-lang-voices {
+  padding: 2px 0 8px 18px;
 }
 
 .piper-voice {

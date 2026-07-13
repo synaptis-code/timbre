@@ -84,9 +84,11 @@ export type PiperVoiceStatus = "available" | "downloading" | "ready" | "error";
 export interface PiperVoiceInfo {
   id: string;
   label: string;
-  gender: string;
+  language_code: string;
+  language_english: string;
+  language_native: string;
+  quality: string;
   size_bytes: number;
-  recommended: boolean;
   status: PiperVoiceStatus;
   received: number;
   error: string | null;

@@ -19,7 +19,7 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import httpx2
 
@@ -32,46 +32,95 @@ logger = logging.getLogger(__name__)
 
 # Catalogue officiel des voix Piper (dépôt Hugging Face rhasspy/piper-voices).
 _HF_ROOT = "https://huggingface.co/rhasspy/piper-voices/resolve/main"
+_CATALOG_URL = f"{_HF_ROOT}/voices.json"
 
 
 @dataclass(frozen=True)
 class PiperVoiceSpec:
-    """Une voix Piper proposée au téléchargement.
+    """Une voix Piper du catalogue (dérivée de voices.json).
 
-    `model` est le nom de fichier partagé (plusieurs voix peuvent venir d'un même
-    fichier multi-locuteurs, distinguées par `speaker_id`).
+    `id` est la clé de la voix (= nom de fichier .onnx = voice_id du persona) ;
+    les voix multi-locuteurs utilisent le locuteur par défaut du modèle.
     """
 
-    id: str  # identifiant de voix = voice_id du persona
-    label: str
-    gender: Literal["F", "H"]
-    model: str  # stem du fichier .onnx, ex. « fr_FR-siwis-medium »
-    hf_dir: str  # dossier dans le dépôt HF, ex. « fr/fr_FR/siwis/medium »
+    id: str  # ex. « fr_FR-siwis-medium »
+    name: str  # ex. « siwis »
+    quality: str  # low | medium | high | x_low
+    language_code: str  # ex. « fr_FR »
+    language_english: str  # ex. « French »
+    language_native: str  # ex. « Français »
+    hf_dir: str  # dossier HF, ex. « fr/fr_FR/siwis/medium »
     size_bytes: int  # taille du .onnx (affichage + progression)
-    speaker_id: int | None = None
-    recommended: bool = False
+
+    @property
+    def label(self) -> str:
+        return f"{self.name.replace('_', ' ').title()} · {self.quality}"
 
 
-PIPER_VOICES: tuple[PiperVoiceSpec, ...] = (
-    PiperVoiceSpec(
-        "fr_FR-siwis-medium", "Siwis · Femme", "F",
-        "fr_FR-siwis-medium", "fr/fr_FR/siwis/medium", 63201294, recommended=True,
-    ),
-    PiperVoiceSpec(
-        "fr_FR-tom-medium", "Tom · Homme", "H",
-        "fr_FR-tom-medium", "fr/fr_FR/tom/medium", 63511038,
-    ),
-    PiperVoiceSpec(
-        "fr_FR-upmc-jessica", "Jessica · Femme", "F",
-        "fr_FR-upmc-medium", "fr/fr_FR/upmc/medium", 76733615, speaker_id=0,
-    ),
-    PiperVoiceSpec(
-        "fr_FR-upmc-pierre", "Pierre · Homme", "H",
-        "fr_FR-upmc-medium", "fr/fr_FR/upmc/medium", 76733615, speaker_id=1,
-    ),
-)
+def _spec_from_entry(entry: dict[str, Any]) -> PiperVoiceSpec | None:
+    """Construit une spec depuis une entrée voices.json (None si incomplète)."""
+    files = entry.get("files", {})
+    onnx = next(
+        (p for p in files if p.endswith(".onnx") and not p.endswith(".onnx.json")), None
+    )
+    if onnx is None:
+        return None
+    lang = entry["language"]
+    return PiperVoiceSpec(
+        id=entry["key"],
+        name=entry.get("name", entry["key"]),
+        quality=entry.get("quality", "medium"),
+        language_code=lang["code"],
+        language_english=lang.get("name_english", lang["code"]),
+        language_native=lang.get("name_native", lang["code"]),
+        hf_dir=onnx.rsplit("/", 1)[0],
+        size_bytes=int(files[onnx].get("size_bytes", 0)),
+    )
 
-SPECS_BY_ID: dict[str, PiperVoiceSpec] = {v.id: v for v in PIPER_VOICES}
+
+def parse_catalog(data: dict[str, Any]) -> dict[str, PiperVoiceSpec]:
+    catalog: dict[str, PiperVoiceSpec] = {}
+    for entry in data.values():
+        spec = _spec_from_entry(entry)
+        if spec is not None:
+            catalog[spec.id] = spec
+    return catalog
+
+
+# Repli minimal si voices.json est injoignable (hors-ligne) : quelques voix clés.
+_BUILTIN_ENTRIES: dict[str, dict[str, Any]] = {
+    "fr_FR-siwis-medium": {
+        "key": "fr_FR-siwis-medium", "name": "siwis", "quality": "medium",
+        "language": {"code": "fr_FR", "name_english": "French", "name_native": "Français"},
+        "files": {"fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx": {"size_bytes": 63201294}},
+    },
+    "en_US-amy-medium": {
+        "key": "en_US-amy-medium", "name": "amy", "quality": "medium",
+        "language": {"code": "en_US", "name_english": "English", "name_native": "English"},
+        "files": {"en/en_US/amy/medium/en_US-amy-medium.onnx": {"size_bytes": 63201294}},
+    },
+}
+
+
+def fetch_catalog() -> dict[str, PiperVoiceSpec]:
+    """Récupère le catalogue complet depuis Hugging Face (repli intégré si échec).
+
+    Fonction bloquante (réseau) : à appeler via `asyncio.to_thread`.
+    """
+    try:
+        with httpx2.Client(follow_redirects=True, timeout=30) as client:
+            resp = client.get(_CATALOG_URL)
+            resp.raise_for_status()
+            return parse_catalog(resp.json())
+    except Exception:
+        logger.warning("Catalogue Piper injoignable — repli sur la liste intégrée.")
+        return parse_catalog(_BUILTIN_ENTRIES)
+
+
+def derive_label(voice_id: str) -> str:
+    """Libellé lisible depuis un id, sans catalogue (voix déjà téléchargée hors-ligne)."""
+    lang, _, rest = voice_id.partition("-")
+    return f"{rest.replace('-', ' ').title()} ({lang})" if rest else voice_id
 
 
 def piper_installed() -> bool:
@@ -116,10 +165,10 @@ def download_voice(
     renomme, pour ne jamais laisser un modèle à moitié téléchargé passer pour « prêt ».
     """
     voices_dir.mkdir(parents=True, exist_ok=True)
-    onnx = voices_dir / f"{spec.model}.onnx"
-    config = voices_dir / f"{spec.model}.onnx.json"
+    onnx = voices_dir / f"{spec.id}.onnx"
+    config = voices_dir / f"{spec.id}.onnx.json"
     part = onnx.with_suffix(".onnx.part")
-    base = f"{_HF_ROOT}/{spec.hf_dir}/{spec.model}"
+    base = f"{_HF_ROOT}/{spec.hf_dir}/{spec.id}"
     with httpx2.Client(follow_redirects=True, timeout=None) as client:
         cfg_resp = client.get(f"{base}.onnx.json")
         cfg_resp.raise_for_status()
@@ -149,33 +198,35 @@ class PiperTTSBackend(TTSBackend):
 
     def __init__(self, voices_dir: Path) -> None:
         self._dir = voices_dir
-        self._cache: dict[str, PiperVoice] = {}  # model -> voix chargée
+        self._cache: dict[str, PiperVoice] = {}  # voice_id -> voix chargée
 
-    def _voice(self, model: str) -> PiperVoice:
-        cached = self._cache.get(model)
+    def _voice(self, voice_id: str) -> PiperVoice:
+        cached = self._cache.get(voice_id)
         if cached is not None:
             return cached
         from piper import PiperVoice  # import différé : extra optionnel
 
-        onnx = self._dir / f"{model}.onnx"
-        config = self._dir / f"{model}.onnx.json"
+        onnx = self._dir / f"{voice_id}.onnx"
+        config = self._dir / f"{voice_id}.onnx.json"
         if not onnx.exists() or not config.exists():
             raise TTSError(
                 "piper_voice_missing",
-                f"La voix Piper « {model} » n'est pas téléchargée. "
+                f"La voix Piper « {voice_id} » n'est pas téléchargée. "
                 "Va dans Réglages → Voix pour la récupérer.",
             )
         voice = PiperVoice.load(str(onnx), str(config))
-        self._cache[model] = voice
+        self._cache[voice_id] = voice
         return voice
 
-    def _render(self, spec: PiperVoiceSpec, text: str, rate: float) -> bytes:
+    def _render(self, voice_id: str, text: str, rate: float) -> bytes:
         from piper import SynthesisConfig
 
-        voice = self._voice(spec.model)
+        voice = self._voice(voice_id)
         # length_scale est l'inverse de la vitesse (plus grand = plus lent).
         length_scale = 1.0 / rate if rate > 0 else 1.0
-        syn = SynthesisConfig(length_scale=length_scale, speaker_id=spec.speaker_id)
+        # Voix multi-locuteurs : on prend le locuteur par défaut (0).
+        speaker_id = 0 if getattr(voice.config, "num_speakers", 1) > 1 else None
+        syn = SynthesisConfig(length_scale=length_scale, speaker_id=speaker_id)
         pcm = b"".join(chunk.audio_int16_bytes for chunk in voice.synthesize(text, syn))
         buffer = BytesIO()
         with wave.open(buffer, "wb") as wav:
@@ -188,12 +239,9 @@ class PiperTTSBackend(TTSBackend):
     async def synthesize(
         self, text: str, voice: str, rate: float = 1.0, pitch: int = 0
     ) -> AsyncIterator[bytes]:
-        spec = SPECS_BY_ID.get(voice)
-        if spec is None:
-            raise TTSError("piper_voice_unknown", f"Voix Piper inconnue : « {voice} ».")
         try:
             # Synthèse CPU bloquante → thread pour ne pas figer la boucle asyncio.
-            wav = await asyncio.to_thread(self._render, spec, text, rate)
+            wav = await asyncio.to_thread(self._render, voice, text, rate)
         except TTSError:
             raise
         except Exception as exc:  # pragma: no cover - garde-fou runtime

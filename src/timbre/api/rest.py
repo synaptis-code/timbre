@@ -19,7 +19,6 @@ from timbre.plugins.llm.providers import (
     config_key,
 )
 from timbre.plugins.tts.library import VoiceLibrary
-from timbre.plugins.tts.piper import SPECS_BY_ID as PIPER_SPECS_BY_ID
 from timbre.storage import ConversationMeta, Storage, StoredMessage
 
 router = APIRouter(prefix="/api")
@@ -209,6 +208,19 @@ EDGE_VOICES: list[VoiceOption] = [
         id="fr-FR-VivienneMultilingualNeural", label="Vivienne · Multilingue", engine="edge-tts"
     ),
 ]
+EDGE_VOICE_IDS: frozenset[str] = frozenset(v.id for v in EDGE_VOICES)
+
+
+def voice_engine(voice_id: str) -> str:
+    """Moteur d'une voix, déduit de son identifiant.
+
+    Les clés Piper portent un code langue « xx_YY » (underscore), ex.
+    « fr_FR-siwis-medium » ; les identifiants edge-tts n'utilisent que des tirets
+    (« fr-FR-VivienneMultilingualNeural »). Tout le reste retombe sur edge-tts.
+    """
+    if voice_id in EDGE_VOICE_IDS:
+        return "edge-tts"
+    return "piper" if "_" in voice_id else "edge-tts"
 
 
 def _library(request: Request) -> VoiceLibrary:
@@ -217,12 +229,12 @@ def _library(request: Request) -> VoiceLibrary:
 
 
 @router.get("/voices")
-def list_voices(request: Request) -> list[VoiceOption]:
+async def list_voices(request: Request) -> list[VoiceOption]:
     """Voix sélectionnables = Vivienne + voix Piper effectivement téléchargées."""
-    ready = _library(request).ready_voice_ids()
+    library = _library(request)
     piper = [
-        VoiceOption(id=vid, label=f"{PIPER_SPECS_BY_ID[vid].label} · Piper", engine="piper")
-        for vid in ready
+        VoiceOption(id=vid, label=f"{await library.label_for(vid)} · Piper", engine="piper")
+        for vid in library.ready_voice_ids()
     ]
     return [*EDGE_VOICES, *piper]
 
@@ -230,9 +242,11 @@ def list_voices(request: Request) -> list[VoiceOption]:
 class PiperVoiceInfo(BaseModel):
     id: str
     label: str
-    gender: str
+    language_code: str
+    language_english: str
+    language_native: str
+    quality: str
     size_bytes: int
-    recommended: bool
     status: str  # available | downloading | ready | error
     received: int
     error: str | None
@@ -243,17 +257,17 @@ class PiperLibrary(BaseModel):
     voices: list[PiperVoiceInfo]
 
 
-def _piper_library(request: Request) -> PiperLibrary:
+async def _piper_library(request: Request) -> PiperLibrary:
     library = _library(request)
     return PiperLibrary(
         package_installed=library.package_installed,
-        voices=[PiperVoiceInfo(**vars(state)) for state in library.voice_states()],
+        voices=[PiperVoiceInfo(**vars(state)) for state in await library.voice_states()],
     )
 
 
 @router.get("/voices/piper")
-def get_piper_library(request: Request) -> PiperLibrary:
-    return _piper_library(request)
+async def get_piper_library(request: Request) -> PiperLibrary:
+    return await _piper_library(request)
 
 
 @router.post("/voices/piper/{voice_id}/download", status_code=202)
@@ -264,16 +278,16 @@ async def download_piper_voice(request: Request, voice_id: str) -> PiperLibrary:
         raise HTTPException(status_code=404, detail="Voix Piper inconnue.") from exc
     except TTSError as exc:
         raise HTTPException(status_code=400, detail=exc.message) from exc
-    return _piper_library(request)
+    return await _piper_library(request)
 
 
 @router.delete("/voices/piper/{voice_id}")
-def delete_piper_voice(request: Request, voice_id: str) -> PiperLibrary:
+async def delete_piper_voice(request: Request, voice_id: str) -> PiperLibrary:
     try:
         _library(request).delete_voice(voice_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Voix Piper inconnue.") from exc
-    return _piper_library(request)
+    return await _piper_library(request)
 
 
 _PREVIEW_TEXT = "Hello! This is a preview of my voice. How do I sound?"
@@ -283,8 +297,7 @@ _PREVIEW_TEXT = "Hello! This is a preview of my voice. How do I sound?"
 async def preview_voice(request: Request, voice_id: str) -> Response:
     """Synthétise une courte phrase avec la voix demandée (aperçu à l'écoute)."""
     orchestrator = request.app.state.orchestrator
-    engine_name = "piper" if voice_id in PIPER_SPECS_BY_ID else "edge-tts"
-    engine = orchestrator.tts_engine(engine_name)
+    engine = orchestrator.tts_engine(voice_engine(voice_id))
     if engine is None:
         raise HTTPException(
             status_code=400,
@@ -318,7 +331,7 @@ def _slugify(name: str) -> str:
 def _build_persona(persona_id: str, payload: PersonaPayload) -> Persona:
     # Le moteur découle de la voix choisie : une voix Piper → moteur « piper »,
     # sinon edge-tts (Vivienne). L'UI n'a pas à gérer le moteur explicitement.
-    engine = "piper" if payload.voice_id in PIPER_SPECS_BY_ID else "edge-tts"
+    engine = voice_engine(payload.voice_id)
     return Persona(
         id=persona_id,
         name=payload.name,

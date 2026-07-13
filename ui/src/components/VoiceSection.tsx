@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type PiperLibrary, type PiperVoiceInfo } from "../api";
 import { previewVoice } from "../voicePreview";
 
@@ -39,8 +39,8 @@ const VIVIENNE_BADGES: EngineBadge[] = [
 
 const PIPER_BADGES: EngineBadge[] = [
   { label: "100 % local", tone: "good" },
+  { label: "~50 langues", tone: "good" },
   { label: "Léger · CPU", tone: "good" },
-  { label: "Moins expressif", tone: "neutral" },
 ];
 
 const ORPHEUS_BADGES: EngineBadge[] = [
@@ -63,21 +63,16 @@ function Badges({ badges }: { badges: EngineBadge[] }) {
 
 const formatMo = (bytes: number) => `${Math.round(bytes / 1_000_000)} Mo`;
 
-function PiperVoiceRow({
-  voice,
-  busy,
-  previewing,
-  onDownload,
-  onDelete,
-  onPreview,
-}: {
+interface RowProps {
   voice: PiperVoiceInfo;
   busy: boolean;
   previewing: string | null;
   onDownload: (id: string) => void;
   onDelete: (id: string) => void;
   onPreview: (id: string) => void;
-}) {
+}
+
+function PiperVoiceRow({ voice, busy, previewing, onDownload, onDelete, onPreview }: RowProps) {
   const percent =
     voice.status === "downloading" && voice.size_bytes > 0
       ? Math.min(100, Math.round((voice.received / voice.size_bytes) * 100))
@@ -86,10 +81,7 @@ function PiperVoiceRow({
   return (
     <div className="piper-voice">
       <div className="piper-voice-info">
-        <span className="piper-voice-name">
-          {voice.label}
-          {voice.recommended && <span className="piper-voice-reco">recommandée</span>}
-        </span>
+        <span className="piper-voice-name">{voice.label}</span>
         <span className="piper-voice-meta">{formatMo(voice.size_bytes)}</span>
       </div>
 
@@ -138,11 +130,20 @@ function PiperVoiceRow({
   );
 }
 
+interface LanguageGroup {
+  code: string;
+  native: string;
+  english: string;
+  voices: PiperVoiceInfo[];
+}
+
 export function VoiceSection() {
   const [piper, setPiper] = useState<PiperLibrary | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [loadFailed, setLoadFailed] = useState(false);
   const pollRef = useRef<number | null>(null);
 
   const preview = useCallback((voiceId: string) => {
@@ -155,7 +156,9 @@ export function VoiceSection() {
   const refresh = useCallback(async () => {
     try {
       setPiper(await api.getPiperLibrary());
+      setLoadFailed(false);
     } catch {
+      setLoadFailed(true);
       setFailed("Impossible de charger la bibliothèque de voix.");
     }
   }, []);
@@ -164,7 +167,6 @@ export function VoiceSection() {
     void refresh();
   }, [refresh]);
 
-  // Interrogation tant qu'un téléchargement est en cours.
   const downloading = piper?.voices.some((v) => v.status === "downloading") ?? false;
   useEffect(() => {
     if (!downloading) {
@@ -209,6 +211,41 @@ export function VoiceSection() {
     }
   }, []);
 
+  const installed = useMemo(
+    () => (piper?.voices ?? []).filter((v) => v.status === "ready" || v.status === "downloading"),
+    [piper],
+  );
+
+  const groups = useMemo<LanguageGroup[]>(() => {
+    const q = query.trim().toLowerCase();
+    const byLang = new Map<string, LanguageGroup>();
+    for (const voice of piper?.voices ?? []) {
+      const matches =
+        q === "" ||
+        voice.language_english.toLowerCase().includes(q) ||
+        voice.language_native.toLowerCase().includes(q) ||
+        voice.language_code.toLowerCase().includes(q) ||
+        voice.label.toLowerCase().includes(q);
+      if (!matches) continue;
+      let group = byLang.get(voice.language_code);
+      if (group === undefined) {
+        group = {
+          code: voice.language_code,
+          native: voice.language_native,
+          english: voice.language_english,
+          voices: [],
+        };
+        byLang.set(voice.language_code, group);
+      }
+      group.voices.push(voice);
+    }
+    return [...byLang.values()].sort(
+      (a, b) => b.voices.length - a.voices.length || a.english.localeCompare(b.english),
+    );
+  }, [piper, query]);
+
+  const rowProps = { busy, previewing, onDownload: download, onDelete: remove, onPreview: preview };
+
   return (
     <>
       <h1 className="settings-title">Voix</h1>
@@ -247,34 +284,69 @@ export function VoiceSection() {
           <div className="voice-engine-head">
             <div>
               <h2 className="voice-engine-name">Piper</h2>
-              <p className="voice-engine-tagline">100 % local, léger, hors-ligne</p>
+              <p className="voice-engine-tagline">100 % local — une cinquantaine de langues</p>
             </div>
           </div>
           <p className="voice-engine-desc">
             Moteur entièrement local : chaque voix est un petit fichier qui tourne sur le
-            processeur, sans carte graphique ni connexion. Télécharge une ou plusieurs
-            voix ci-dessous — elles apparaîtront ensuite dans l'éditeur de personas.
+            processeur, sans carte graphique ni connexion. Cherche une langue, télécharge une
+            voix — elle apparaîtra ensuite dans l'éditeur de personas.
           </p>
           <Badges badges={PIPER_BADGES} />
 
-          <div className="piper-voices">
-            {piper === null ? (
-              <p className="piper-hint">Chargement…</p>
+          {piper === null ? (
+            loadFailed ? (
+              <div className="piper-load-error">
+                <p className="piper-hint">Catalogue de voix indisponible.</p>
+                <button type="button" className="btn-secondary btn-compact" onClick={() => void refresh()}>
+                  Réessayer
+                </button>
+              </div>
             ) : (
-              piper.voices.map((voice) => (
-                <PiperVoiceRow
-                  key={voice.id}
-                  voice={voice}
-                  busy={busy}
-                  previewing={previewing}
-                  onDownload={download}
-                  onDelete={remove}
-                  onPreview={preview}
-                />
-              ))
-            )}
-            {failed !== null && <p className="piper-voice-error">{failed}</p>}
-          </div>
+              <p className="piper-hint">Chargement du catalogue…</p>
+            )
+          ) : (
+            <>
+              {installed.length > 0 && (
+                <div className="piper-installed">
+                  <p className="piper-group-label">Vos voix</p>
+                  {installed.map((voice) => (
+                    <PiperVoiceRow key={voice.id} voice={voice} {...rowProps} />
+                  ))}
+                </div>
+              )}
+
+              <input
+                className="piper-search"
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Chercher une langue (français, english, español, deutsch…)"
+                aria-label="Chercher une langue"
+              />
+
+              <div className="piper-langs">
+                {groups.length === 0 ? (
+                  <p className="piper-hint">Aucune langue ne correspond à « {query} ».</p>
+                ) : (
+                  groups.map((group) => (
+                    <details key={group.code} className="piper-lang" open={query.trim() !== ""}>
+                      <summary className="piper-lang-summary">
+                        <span className="piper-lang-name">{group.native}</span>
+                        <span className="piper-lang-count">{group.voices.length}</span>
+                      </summary>
+                      <div className="piper-lang-voices">
+                        {group.voices.map((voice) => (
+                          <PiperVoiceRow key={voice.id} voice={voice} {...rowProps} />
+                        ))}
+                      </div>
+                    </details>
+                  ))
+                )}
+              </div>
+              {failed !== null && <p className="piper-voice-error">{failed}</p>}
+            </>
+          )}
         </section>
 
         {/* Orpheus */}
