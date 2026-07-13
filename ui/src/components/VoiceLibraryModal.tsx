@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { api, type PiperLibrary, type PiperVoiceInfo } from "../api";
 import { previewVoice } from "../voicePreview";
 
@@ -236,7 +237,7 @@ export function VoiceLibraryModal({
 
   const rowProps = { busy, previewing, onDownload: download, onDelete: remove, onPreview: preview };
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
       <div
         className="modal-panel voice-modal"
@@ -319,6 +320,7 @@ export function VoiceLibraryModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
