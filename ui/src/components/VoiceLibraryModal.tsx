@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api, type PiperLibrary, type PiperVoiceInfo } from "../api";
 import { previewVoice } from "../voicePreview";
+import { OrpheusPanel } from "./OrpheusPanel";
 
 function PreviewButton({
   voiceId,
@@ -318,6 +319,8 @@ export function VoiceLibraryModal({
               {failed !== null && <p className="piper-voice-error">{failed}</p>}
             </>
           )}
+
+          <OrpheusPanel onChanged={onChanged} />
         </div>
       </div>
     </div>,

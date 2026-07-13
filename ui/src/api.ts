@@ -99,6 +99,13 @@ export interface PiperLibrary {
   voices: PiperVoiceInfo[];
 }
 
+export interface OrpheusStatus {
+  ready: boolean;
+  enabled: boolean;
+  model: string;
+  voices: string[];
+}
+
 export const api = {
   listConversations: () => request<ConversationMeta[]>("/api/conversations"),
   createConversation: () => request<ConversationMeta>("/api/conversations", { method: "POST" }),
@@ -138,6 +145,13 @@ export const api = {
     request<PiperLibrary>(`/api/voices/piper/${voiceId}/download`, { method: "POST" }),
   deletePiperVoice: (voiceId: string) =>
     request<PiperLibrary>(`/api/voices/piper/${voiceId}`, { method: "DELETE" }),
+  getOrpheus: () => request<OrpheusStatus>("/api/voices/orpheus"),
+  enableOrpheus: (model: string) =>
+    request<OrpheusStatus>("/api/voices/orpheus", {
+      method: "POST",
+      body: JSON.stringify({ model }),
+    }),
+  disableOrpheus: () => request<OrpheusStatus>("/api/voices/orpheus", { method: "DELETE" }),
   getSettings: () => request<{ language: string }>("/api/settings"),
   putSettings: (language: string) =>
     request<{ language: string }>("/api/settings", {
