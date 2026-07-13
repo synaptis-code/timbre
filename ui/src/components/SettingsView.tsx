@@ -3,7 +3,6 @@ import { FeedbackSection } from "./FeedbackSection";
 import { PersonasSection } from "./PersonasSection";
 import { ProvidersSection } from "./ProvidersSection";
 import type { SettingsCategory as Category } from "./Sidebar";
-import { VoiceSection } from "./VoiceSection";
 
 interface SettingsViewProps {
   language: string;
@@ -66,8 +65,6 @@ export function SettingsView({
         {category === "providers" && <ProvidersSection />}
 
         {category === "personas" && <PersonasSection />}
-
-        {category === "voice" && <VoiceSection />}
 
         {category === "support" && (
           <>

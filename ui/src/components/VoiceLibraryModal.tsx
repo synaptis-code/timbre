@@ -11,7 +11,6 @@ function PreviewButton({
   previewing: string | null;
   onPreview: (id: string) => void;
 }) {
-  const active = previewing === voiceId;
   return (
     <button
       type="button"
@@ -21,43 +20,8 @@ function PreviewButton({
       title="Écouter un aperçu"
       aria-label="Écouter un aperçu de la voix"
     >
-      {active ? "…" : "▶"}
+      {previewing === voiceId ? "…" : "▶"}
     </button>
-  );
-}
-
-interface EngineBadge {
-  label: string;
-  tone: "neutral" | "good" | "warn";
-}
-
-const VIVIENNE_BADGES: EngineBadge[] = [
-  { label: "Cloud (Microsoft)", tone: "warn" },
-  { label: "Multilingue", tone: "good" },
-  { label: "Sans émotions", tone: "neutral" },
-];
-
-const PIPER_BADGES: EngineBadge[] = [
-  { label: "100 % local", tone: "good" },
-  { label: "~50 langues", tone: "good" },
-  { label: "Léger · CPU", tone: "good" },
-];
-
-const ORPHEUS_BADGES: EngineBadge[] = [
-  { label: "Émotions", tone: "good" },
-  { label: "NVIDIA recommandée", tone: "warn" },
-  { label: "Lourd", tone: "neutral" },
-];
-
-function Badges({ badges }: { badges: EngineBadge[] }) {
-  return (
-    <div className="voice-engine-badges">
-      {badges.map((badge) => (
-        <span key={badge.label} className={`voice-badge voice-badge--${badge.tone}`}>
-          {badge.label}
-        </span>
-      ))}
-    </div>
   );
 }
 
@@ -137,14 +101,21 @@ interface LanguageGroup {
   voices: PiperVoiceInfo[];
 }
 
-export function VoiceSection() {
+export function VoiceLibraryModal({
+  onClose,
+  onChanged,
+}: {
+  onClose: () => void;
+  onChanged: () => void;
+}) {
   const [piper, setPiper] = useState<PiperLibrary | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [previewing, setPreviewing] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [loadFailed, setLoadFailed] = useState(false);
   const pollRef = useRef<number | null>(null);
+  const wasDownloading = useRef(false);
 
   const preview = useCallback((voiceId: string) => {
     setPreviewing(voiceId);
@@ -159,7 +130,6 @@ export function VoiceSection() {
       setLoadFailed(false);
     } catch {
       setLoadFailed(true);
-      setFailed("Impossible de charger la bibliothèque de voix.");
     }
   }, []);
 
@@ -167,7 +137,23 @@ export function VoiceSection() {
     void refresh();
   }, [refresh]);
 
+  // Fermeture au clavier (Échap).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   const downloading = piper?.voices.some((v) => v.status === "downloading") ?? false;
+
+  // Un téléchargement vient de se terminer → rafraîchir les voix du persona.
+  useEffect(() => {
+    if (wasDownloading.current && !downloading) onChanged();
+    wasDownloading.current = downloading;
+  }, [downloading, onChanged]);
+
   useEffect(() => {
     if (!downloading) {
       if (pollRef.current !== null) {
@@ -199,17 +185,21 @@ export function VoiceSection() {
     }
   }, []);
 
-  const remove = useCallback(async (id: string) => {
-    setBusy(true);
-    setFailed(null);
-    try {
-      setPiper(await api.deletePiperVoice(id));
-    } catch {
-      setFailed("Suppression impossible.");
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+  const remove = useCallback(
+    async (id: string) => {
+      setBusy(true);
+      setFailed(null);
+      try {
+        setPiper(await api.deletePiperVoice(id));
+        onChanged();
+      } catch {
+        setFailed("Suppression impossible.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [onChanged],
+  );
 
   const installed = useMemo(
     () => (piper?.voices ?? []).filter((v) => v.status === "ready" || v.status === "downloading"),
@@ -247,58 +237,47 @@ export function VoiceSection() {
   const rowProps = { busy, previewing, onDownload: download, onDelete: remove, onPreview: preview };
 
   return (
-    <>
-      <h1 className="settings-title">Voix</h1>
-      <p className="settings-subtitle">
-        Choisis le moteur de synthèse vocale. Vivienne est active par défaut&nbsp;; Piper
-        et Orpheus ne sont téléchargés que si tu le souhaites, pour garder Timbre léger.
-      </p>
-
-      <div className="voice-engines">
-        {/* Vivienne */}
-        <section className="voice-engine">
-          <div className="voice-engine-head">
-            <div>
-              <h2 className="voice-engine-name">Vivienne</h2>
-              <p className="voice-engine-tagline">La voix par défaut, prête à l'emploi</p>
-            </div>
-            <div className="voice-engine-head-actions">
-              <PreviewButton
-                voiceId="fr-FR-VivienneMultilingualNeural"
-                previewing={previewing}
-                onPreview={preview}
-              />
-              <span className="voice-engine-state voice-engine-state--active">Active</span>
-            </div>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal-panel voice-modal"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Bibliothèque de voix"
+      >
+        <div className="modal-head">
+          <div>
+            <h2 className="modal-title">Bibliothèque de voix</h2>
+            <p className="modal-intro">
+              Voix locales Piper — une cinquantaine de langues, 100 % hors-ligne. Vivienne
+              (cloud) reste toujours disponible.
+            </p>
           </div>
-          <p className="voice-engine-desc">
-            Voix neurale de Microsoft, très naturelle et à faible latence. Multilingue
-            (français, anglais, espagnol…). La synthèse se fait sur les serveurs de
-            Microsoft — notre seule exception au « tout local » — et sans émotions.
-          </p>
-          <Badges badges={VIVIENNE_BADGES} />
-        </section>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Fermer">
+            ✕
+          </button>
+        </div>
 
-        {/* Piper */}
-        <section className="voice-engine">
-          <div className="voice-engine-head">
-            <div>
-              <h2 className="voice-engine-name">Piper</h2>
-              <p className="voice-engine-tagline">100 % local — une cinquantaine de langues</p>
-            </div>
-          </div>
-          <p className="voice-engine-desc">
-            Moteur entièrement local : chaque voix est un petit fichier qui tourne sur le
-            processeur, sans carte graphique ni connexion. Cherche une langue, télécharge une
-            voix — elle apparaîtra ensuite dans l'éditeur de personas.
-          </p>
-          <Badges badges={PIPER_BADGES} />
+        <input
+          className="piper-search"
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Chercher une langue (français, english, español, deutsch…)"
+          aria-label="Chercher une langue"
+          autoFocus
+        />
 
+        <div className="voice-modal-body">
           {piper === null ? (
             loadFailed ? (
               <div className="piper-load-error">
                 <p className="piper-hint">Catalogue de voix indisponible.</p>
-                <button type="button" className="btn-secondary btn-compact" onClick={() => void refresh()}>
+                <button
+                  type="button"
+                  className="btn-secondary btn-compact"
+                  onClick={() => void refresh()}
+                >
                   Réessayer
                 </button>
               </div>
@@ -307,7 +286,7 @@ export function VoiceSection() {
             )
           ) : (
             <>
-              {installed.length > 0 && (
+              {installed.length > 0 && query.trim() === "" && (
                 <div className="piper-installed">
                   <p className="piper-group-label">Vos voix</p>
                   {installed.map((voice) => (
@@ -315,15 +294,6 @@ export function VoiceSection() {
                   ))}
                 </div>
               )}
-
-              <input
-                className="piper-search"
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Chercher une langue (français, english, español, deutsch…)"
-                aria-label="Chercher une langue"
-              />
 
               <div className="piper-langs">
                 {groups.length === 0 ? (
@@ -347,25 +317,8 @@ export function VoiceSection() {
               {failed !== null && <p className="piper-voice-error">{failed}</p>}
             </>
           )}
-        </section>
-
-        {/* Orpheus */}
-        <section className="voice-engine voice-engine--soon">
-          <div className="voice-engine-head">
-            <div>
-              <h2 className="voice-engine-name">Orpheus</h2>
-              <p className="voice-engine-tagline">Voix expressive avec émotions</p>
-            </div>
-            <span className="voice-engine-state">Bientôt</span>
-          </div>
-          <p className="voice-engine-desc">
-            Moteur local basé sur un LLM : il gère les émotions (rires, soupirs…) avec un
-            rendu proche de l'humain. Le plus gourmand — une carte NVIDIA sera recommandée.
-            Intégration prévue via LM Studio dans une prochaine version.
-          </p>
-          <Badges badges={ORPHEUS_BADGES} />
-        </section>
+        </div>
       </div>
-    </>
+    </div>
   );
 }

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, type Persona, type PersonaPayload, type VoiceOption } from "../api";
 import { PlusIcon, TrashIcon } from "../icons";
 import { previewVoice } from "../voicePreview";
+import { VoiceLibraryModal } from "./VoiceLibraryModal";
 
 interface Draft extends PersonaPayload {
   id: string | null; // null = création
@@ -40,6 +41,7 @@ export function PersonasSection() {
   const [feedback, setFeedback] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   const listen = (voiceId: string) => {
     setPreviewing(true);
@@ -49,11 +51,15 @@ export function PersonasSection() {
   };
 
   const load = () => api.listPersonas().then(setPersonas);
+  const reloadVoices = useCallback(
+    () => api.listVoices().then(setVoices).catch(() => undefined),
+    [],
+  );
 
   useEffect(() => {
     void load().catch((error: unknown) => setFeedback({ kind: "error", text: String(error) }));
-    void api.listVoices().then(setVoices).catch(() => undefined);
-  }, []);
+    void reloadVoices();
+  }, [reloadVoices]);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((prev) => (prev === null ? prev : { ...prev, [key]: value }));
@@ -169,6 +175,13 @@ export function PersonasSection() {
                   {previewing ? "…" : "▶"}
                 </button>
               </div>
+              <button
+                type="button"
+                className="voice-library-link"
+                onClick={() => setLibraryOpen(true)}
+              >
+                + Ajouter d'autres langues
+              </button>
             </label>
             <label className="provider-field persona-field-sm">
               <span>Débit · {draft.rate.toFixed(2)}</span>
@@ -230,6 +243,9 @@ export function PersonasSection() {
             <p className="provider-feedback provider-feedback--error">{feedback.text}</p>
           )}
         </div>
+        {libraryOpen && (
+          <VoiceLibraryModal onClose={() => setLibraryOpen(false)} onChanged={reloadVoices} />
+        )}
       </>
     );
   }
@@ -243,10 +259,15 @@ export function PersonasSection() {
             Crée des personnalités avec leur voix.
           </p>
         </div>
-        <button type="button" className="btn-primary" onClick={() => setDraft({ ...EMPTY })}>
-          <PlusIcon size={16} />
-          Nouveau
-        </button>
+        <div className="settings-head-actions">
+          <button type="button" className="btn-secondary" onClick={() => setLibraryOpen(true)}>
+            Bibliothèque de voix
+          </button>
+          <button type="button" className="btn-primary" onClick={() => setDraft({ ...EMPTY })}>
+            <PlusIcon size={16} />
+            Nouveau
+          </button>
+        </div>
       </div>
 
       {feedback?.kind === "ok" && (
@@ -276,6 +297,10 @@ export function PersonasSection() {
           </div>
         ))}
       </div>
+
+      {libraryOpen && (
+        <VoiceLibraryModal onClose={() => setLibraryOpen(false)} onChanged={reloadVoices} />
+      )}
     </>
   );
 }

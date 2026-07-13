@@ -1475,6 +1475,114 @@ a.btn-secondary {
   opacity: 0.72;
 }
 
+/* En-tête Personas : actions groupées (Bibliothèque de voix + Nouveau) */
+.settings-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Lien discret « + Ajouter d'autres langues » sous le sélecteur de voix */
+.voice-library-link {
+  margin-top: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 480;
+  color: var(--ink);
+  opacity: 0.65;
+  cursor: pointer;
+  width: fit-content;
+}
+
+.voice-library-link:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+/* Modale bibliothèque de voix */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.32);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.modal-panel {
+  background: var(--canvas);
+  border-radius: var(--r-lg);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
+  display: flex;
+  flex-direction: column;
+  max-height: 84vh;
+  overflow: hidden;
+}
+
+.voice-modal {
+  width: 640px;
+  max-width: 100%;
+  padding: 22px 24px 8px;
+}
+
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.modal-title {
+  font-size: 20px;
+  font-weight: 560;
+  letter-spacing: -0.3px;
+  margin: 0;
+}
+
+.modal-intro {
+  font-size: 13px;
+  font-weight: 400;
+  opacity: 0.6;
+  margin: 4px 0 0;
+  max-width: 52ch;
+}
+
+.modal-close {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--hairline);
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close:hover {
+  background: var(--surface-soft);
+}
+
+.voice-modal-body {
+  overflow-y: auto;
+  margin: 4px -24px 0;
+  padding: 0 24px 16px;
+  flex: 1;
+}
+
+.voice-modal .piper-search {
+  margin-top: 16px;
+}
+
 .voice-engine-head-actions {
   display: flex;
   align-items: center;
