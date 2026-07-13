@@ -290,12 +290,54 @@ async def delete_piper_voice(request: Request, voice_id: str) -> PiperLibrary:
     return await _piper_library(request)
 
 
-_PREVIEW_TEXT = "Hello! This is a preview of my voice. How do I sound?"
+# Phrase d'aperçu par famille de langue (« Bonjour, voici un aperçu de ma voix »).
+# Repli anglais pour les langues non listées. La famille est déduite de l'id de la
+# voix : « de_DE-thorsten-medium » → « de », « fr-FR-VivienneMultilingual » → « fr ».
+_PREVIEW_TEXTS: dict[str, str] = {
+    "en": "Hello! This is a preview of my voice.",
+    "fr": "Bonjour ! Voici un aperçu de ma voix.",
+    "de": "Hallo! Das ist eine Hörprobe meiner Stimme.",
+    "es": "¡Hola! Esta es una muestra de mi voz.",
+    "it": "Ciao! Questa è un'anteprima della mia voce.",
+    "pt": "Olá! Esta é uma amostra da minha voz.",
+    "nl": "Hallo! Dit is een voorbeeld van mijn stem.",
+    "ru": "Привет! Это пример моего голоса.",
+    "pl": "Cześć! To jest próbka mojego głosu.",
+    "uk": "Привіт! Це зразок мого голосу.",
+    "zh": "你好！这是我的声音示例。",  # noqa: RUF001 — ponctuation chinoise volontaire
+    "ar": "مرحبًا! هذه عيّنة من صوتي.",
+    "hi": "नमस्ते! यह मेरी आवाज़ का एक नमूना है।",
+    "tr": "Merhaba! Bu, sesimin bir örneği.",
+    "sv": "Hej! Det här är ett smakprov på min röst.",
+    "el": "Γεια σας! Αυτό είναι ένα δείγμα της φωνής μου.",
+    "cs": "Ahoj! Toto je ukázka mého hlasu.",
+    "fi": "Hei! Tämä on näyte äänestäni.",
+    "da": "Hej! Dette er en prøve på min stemme.",
+    "no": "Hei! Dette er en prøve på stemmen min.",
+    "ro": "Bună! Aceasta este o mostră a vocii mele.",
+    "hu": "Szia! Ez egy minta a hangomból.",
+    "ca": "Hola! Aquesta és una mostra de la meva veu.",
+    "fa": "سلام! این نمونه‌ای از صدای من است.",
+    "vi": "Xin chào! Đây là một mẫu giọng nói của tôi.",
+    "is": "Halló! Þetta er sýnishorn af röddinni minni.",
+    "sk": "Ahoj! Toto je ukážka môjho hlasu.",
+    "sr": "Здраво! Ово је узорак мог гласа.",  # noqa: RUF001 — cyrillique volontaire
+    "bg": "Здравейте! Това е мостра на моя глас.",  # noqa: RUF001 — cyrillique volontaire
+    "id": "Halo! Ini adalah contoh suara saya.",
+    "sw": "Habari! Hii ni sampuli ya sauti yangu.",
+}
+_PREVIEW_DEFAULT = _PREVIEW_TEXTS["en"]
+
+
+def preview_text(voice_id: str) -> str:
+    """Phrase d'aperçu dans la langue de la voix (repli anglais)."""
+    family = voice_id.split("-", 1)[0].split("_", 1)[0].lower()
+    return _PREVIEW_TEXTS.get(family, _PREVIEW_DEFAULT)
 
 
 @router.get("/voices/{voice_id}/preview")
 async def preview_voice(request: Request, voice_id: str) -> Response:
-    """Synthétise une courte phrase avec la voix demandée (aperçu à l'écoute)."""
+    """Synthétise une courte phrase (dans la langue de la voix) pour l'aperçu."""
     orchestrator = request.app.state.orchestrator
     engine = orchestrator.tts_engine(voice_engine(voice_id))
     if engine is None:
@@ -304,7 +346,8 @@ async def preview_voice(request: Request, voice_id: str) -> Response:
             detail="Moteur de voix indisponible (voix non téléchargée ?).",
         )
     try:
-        audio = b"".join([chunk async for chunk in engine.synthesize(_PREVIEW_TEXT, voice_id)])
+        text = preview_text(voice_id)
+        audio = b"".join([chunk async for chunk in engine.synthesize(text, voice_id)])
     except TTSError as exc:
         raise HTTPException(status_code=400, detail=exc.message) from exc
     media_type = "audio/wav" if engine.audio_format == "wav" else "audio/mpeg"

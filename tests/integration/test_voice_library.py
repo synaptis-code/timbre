@@ -85,6 +85,16 @@ def test_ready_voice_appears_in_voices_and_is_deletable(tmp_path: Path) -> None:
         assert all(v["id"] != "fr_FR-siwis-medium" for v in voices)
 
 
+def test_preview_text_matches_voice_language() -> None:
+    from timbre.api.rest import preview_text
+
+    assert preview_text("de_DE-thorsten-medium").startswith("Hallo")
+    assert preview_text("es_ES-davefx-medium").startswith("¡Hola")
+    assert preview_text("fr-FR-VivienneMultilingualNeural").startswith("Bonjour")
+    # Langue non listée → repli anglais.
+    assert preview_text("ka_GE-natia-medium").startswith("Hello")
+
+
 def test_preview_vivienne_returns_audio(tmp_path: Path) -> None:
     with make_client(tmp_path) as client:
         resp = client.get("/api/voices/fr-FR-VivienneMultilingualNeural/preview")
