@@ -31,6 +31,7 @@ export type SettingsCategory =
   | "interface"
   | "providers"
   | "personas"
+  | "voice"
   | "diagnostic"
   | "support"
   | "feedback";
@@ -39,6 +40,7 @@ const SETTINGS_CATEGORIES: ReadonlyArray<readonly [SettingsCategory, string]> = 
   ["interface", "Interface"],
   ["providers", "Fournisseur d'IA"],
   ["personas", "Personas"],
+  ["voice", "Voix"],
   ["diagnostic", "Diagnostic"],
   ["support", "Soutenir"],
   ["feedback", "Contact"],

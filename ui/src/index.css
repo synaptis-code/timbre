@@ -1371,6 +1371,106 @@ a.btn-secondary {
   border-color: var(--ink);
 }
 
+/* — Voix (moteurs TTS) — */
+.voice-engines {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+  max-width: 620px;
+}
+
+.voice-engine {
+  background: var(--surface-soft);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.voice-engine-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.voice-engine-name {
+  font-size: 18px;
+  font-weight: 540;
+  letter-spacing: -0.2px;
+  margin: 0;
+}
+
+.voice-engine-tagline {
+  font-size: 13px;
+  font-weight: 400;
+  opacity: 0.6;
+  margin: 2px 0 0;
+}
+
+.voice-engine-state {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  color: var(--ink);
+  opacity: 0.55;
+}
+
+.voice-engine-state--active {
+  background: var(--ink);
+  color: var(--canvas);
+  border-color: var(--ink);
+  opacity: 1;
+}
+
+.voice-engine-desc {
+  font-size: 14px;
+  font-weight: 380;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 56ch;
+}
+
+.voice-engine-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.voice-badge {
+  font-size: 12px;
+  font-weight: 460;
+  padding: 4px 11px;
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+}
+
+.voice-badge--good {
+  background: var(--block-mint);
+  color: #1a3d24;
+}
+
+.voice-badge--warn {
+  background: var(--block-cream);
+  color: #5c4a1e;
+}
+
+.voice-badge--neutral {
+  background: var(--canvas);
+  color: var(--ink);
+  border-color: var(--hairline);
+  opacity: 0.75;
+}
+
 /* — Personas — */
 .settings-head-row {
   display: flex;
