@@ -1471,6 +1471,144 @@ a.btn-secondary {
   opacity: 0.75;
 }
 
+.voice-engine--soon {
+  opacity: 0.72;
+}
+
+/* Liste des voix Piper téléchargeables */
+.piper-voices {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+  border-top: 1px solid var(--hairline);
+}
+
+.piper-hint {
+  font-size: 13px;
+  opacity: 0.6;
+  padding: 12px 0 2px;
+  margin: 0;
+}
+
+.piper-voice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.piper-voice:last-child {
+  border-bottom: none;
+}
+
+.piper-voice-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.piper-voice-name {
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.piper-voice-reco {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--block-mint);
+  color: #1a3d24;
+}
+
+.piper-voice-meta {
+  font-size: 12px;
+  opacity: 0.55;
+  font-family: var(--mono);
+}
+
+.piper-voice-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.piper-voice-ready {
+  font-size: 13px;
+  font-weight: 480;
+  color: var(--success);
+}
+
+.piper-voice-error {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--magenta);
+}
+
+.btn-compact {
+  padding: 6px 16px;
+  font-size: 13px;
+}
+
+.piper-link-danger {
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--magenta);
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.85;
+}
+
+.piper-link-danger:hover:not(:disabled) {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.piper-link-danger:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.piper-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  min-width: 160px;
+}
+
+.piper-progress-track {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+
+.piper-progress-fill {
+  height: 100%;
+  background: var(--ink);
+  border-radius: var(--r-pill);
+  transition: width 0.3s ease;
+}
+
+.piper-progress-label {
+  font-size: 12px;
+  font-family: var(--mono);
+  opacity: 0.65;
+  min-width: 34px;
+  text-align: right;
+}
+
 /* — Personas — */
 .settings-head-row {
   display: flex;

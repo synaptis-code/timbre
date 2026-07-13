@@ -181,7 +181,7 @@ export default function App() {
           append({ role: "user", text: message.text });
           break;
         case "ai_audio":
-          audioRef.current?.enqueue(message.audio_b64);
+          audioRef.current?.enqueue(message.audio_b64, message.format);
           break;
         case "ai_chunk":
           setMessages((prev) => {

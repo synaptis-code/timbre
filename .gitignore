@@ -16,6 +16,7 @@ ui/public/vad/
 # IDE / OS
 .idea/
 .vscode/
+.claude/
 Thumbs.db
 .DS_Store
 
@@ -24,5 +25,7 @@ timbre.db
 
 # Modèles / données locales (jamais dans le repo)
 models/
+voices/
 *.onnx
+*.onnx.json
 *.gguf

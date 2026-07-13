@@ -133,7 +133,8 @@ class AiAudio(BaseModel):
 
     type: Literal["ai_audio"] = "ai_audio"
     audio_b64: str
-    format: Literal["mp3"] = "mp3"
+    # Format du conteneur audio, selon le moteur : "mp3" (edge-tts) ou "wav" (Piper).
+    format: Literal["mp3", "wav"] = "mp3"
     text: str
 
 

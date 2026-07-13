@@ -75,6 +75,25 @@ export interface PersonaPayload {
 export interface VoiceOption {
   id: string;
   label: string;
+  engine: string;
+}
+
+export type PiperVoiceStatus = "available" | "downloading" | "ready" | "error";
+
+export interface PiperVoiceInfo {
+  id: string;
+  label: string;
+  gender: string;
+  size_bytes: number;
+  recommended: boolean;
+  status: PiperVoiceStatus;
+  received: number;
+  error: string | null;
+}
+
+export interface PiperLibrary {
+  package_installed: boolean;
+  voices: PiperVoiceInfo[];
 }
 
 export const api = {
@@ -111,6 +130,11 @@ export const api = {
     request<Persona>(`/api/personas/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
   deletePersona: (id: string) => request<void>(`/api/personas/${id}`, { method: "DELETE" }),
   listVoices: () => request<VoiceOption[]>("/api/voices"),
+  getPiperLibrary: () => request<PiperLibrary>("/api/voices/piper"),
+  downloadPiperVoice: (voiceId: string) =>
+    request<PiperLibrary>(`/api/voices/piper/${voiceId}/download`, { method: "POST" }),
+  deletePiperVoice: (voiceId: string) =>
+    request<PiperLibrary>(`/api/voices/piper/${voiceId}`, { method: "DELETE" }),
   getSettings: () => request<{ language: string }>("/api/settings"),
   putSettings: (language: string) =>
     request<{ language: string }>("/api/settings", {

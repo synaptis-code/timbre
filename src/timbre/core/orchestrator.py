@@ -13,6 +13,7 @@ import logging
 import time
 from base64 import b64decode, b64encode
 from dataclasses import dataclass
+from typing import Literal
 
 from timbre.core.gpu import vram_snapshot
 from timbre.core.segmenter import SentenceSplitter
@@ -125,6 +126,17 @@ class Orchestrator:
 
     def _engine_for(self, session: Session) -> TTSBackend | None:
         return self._tts_engines.get(session.persona.voice.engine)
+
+    def _audio_format(self, session: Session) -> Literal["mp3", "wav"]:
+        engine = self._engine_for(session)
+        return engine.audio_format if engine is not None else "mp3"
+
+    def register_tts_engine(self, name: str, backend: TTSBackend) -> None:
+        """Ajoute un moteur TTS à chaud (ex. Piper après téléchargement d'une voix).
+
+        Idempotent : n'écrase pas un moteur déjà enregistré (préserve son cache).
+        """
+        self._tts_engines.setdefault(name, backend)
 
     # ── ASR (device) ────────────────────────────────────────────────────────
 
@@ -331,6 +343,7 @@ class Orchestrator:
                 await session.send(
                     AiAudio(
                         audio_b64=b64encode(audio).decode("ascii"),
+                        format=self._audio_format(session),
                         text=clean_for_tts(sentence),
                     )
                 )
@@ -340,7 +353,11 @@ class Orchestrator:
         audio = await self._synthesize(session, text)
         if audio:
             await session.send(
-                AiAudio(audio_b64=b64encode(audio).decode("ascii"), text=clean_for_tts(text))
+                AiAudio(
+                    audio_b64=b64encode(audio).decode("ascii"),
+                    format=self._audio_format(session),
+                    text=clean_for_tts(text),
+                )
             )
 
     async def _synthesize(self, session: Session, sentence: str) -> bytes | None:

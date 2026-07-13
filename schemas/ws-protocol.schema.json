@@ -202,8 +202,11 @@
             "type": "string"
           },
           "format": {
-            "const": "mp3",
             "default": "mp3",
+            "enum": [
+              "mp3",
+              "wav"
+            ],
             "title": "Format",
             "type": "string"
           },

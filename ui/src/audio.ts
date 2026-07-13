@@ -25,8 +25,9 @@ export class AudioQueue {
     void this.current?.play().catch(() => undefined);
   }
 
-  enqueue(audioB64: string, mimeType = "audio/mpeg"): void {
+  enqueue(audioB64: string, format: "mp3" | "wav" = "mp3"): void {
     const bytes = Uint8Array.from(atob(audioB64), (char) => char.charCodeAt(0));
+    const mimeType = format === "wav" ? "audio/wav" : "audio/mpeg";
     const url = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
     this.queue.push(url);
     if (this.current === null) {

@@ -18,6 +18,8 @@ from timbre.plugins.asr.whisper import FasterWhisperASR
 from timbre.plugins.base import ASRBackend, LLMBackend, TTSBackend
 from timbre.plugins.llm.providers import ProviderManager
 from timbre.plugins.tts.edge import EdgeTTSBackend
+from timbre.plugins.tts.library import VoiceLibrary
+from timbre.plugins.tts.piper import PiperTTSBackend, piper_installed
 from timbre.storage import Storage
 
 
@@ -37,6 +39,12 @@ def create_app(
         tts if tts is not None else (EdgeTTSBackend() if app_settings.tts_enabled else None)
     )
     tts_engines: dict[str, TTSBackend] = {"edge-tts": tts_backend} if tts_backend else {}
+    # Moteur Piper local : enregistré d'emblée si le paquet est déjà présent
+    # (les voix se chargent paresseusement). Sinon il sera ajouté à chaud après
+    # le premier téléchargement depuis la catégorie « Voix ».
+    piper_dir = Path(app_settings.piper_voices_dir)
+    if piper_installed():
+        tts_engines["piper"] = PiperTTSBackend(piper_dir)
     asr_backend = (
         asr
         if asr is not None
@@ -78,16 +86,23 @@ def create_app(
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    app.state.settings = app_settings
-    app.state.storage = storage
-    app.state.llm_manager = llm_manager
-    app.state.orchestrator = Orchestrator(
+    orchestrator = Orchestrator(
         llm_manager=llm_manager,
         tts_engines=tts_engines,
         asr=asr_backend,
         personas=personas,
         default_persona_id=app_settings.persona,
         fallback_persona=fallback_persona,
+    )
+    app.state.settings = app_settings
+    app.state.storage = storage
+    app.state.llm_manager = llm_manager
+    app.state.orchestrator = orchestrator
+    app.state.voice_library = VoiceLibrary(
+        piper_dir,
+        on_engine_ready=lambda: orchestrator.register_tts_engine(
+            "piper", PiperTTSBackend(piper_dir)
+        ),
     )
     app.include_router(ws_router)
     app.include_router(rest_router)

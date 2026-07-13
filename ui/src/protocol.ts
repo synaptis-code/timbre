@@ -63,7 +63,7 @@ export interface ModelInfo {
 export interface AiAudio {
   type: "ai_audio";
   audio_b64: string;
-  format: "mp3";
+  format: "mp3" | "wav";
   text: string;
 }
 export interface UserTranscript {

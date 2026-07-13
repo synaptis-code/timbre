@@ -8,6 +8,7 @@ affinées à la phase qui branche chaque moteur (3 : TTS, 4 : ASR/VAD).
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
+from typing import Literal
 
 
 class LLMError(Exception):
@@ -90,11 +91,14 @@ class TTSError(Exception):
 class TTSBackend(ABC):
     """Synthèse texte → audio, streaming phrase par phrase."""
 
+    #: Conteneur produit par `synthesize` — "mp3" (edge-tts) ou "wav" (Piper local).
+    audio_format: Literal["mp3", "wav"] = "mp3"
+
     @abstractmethod
     def synthesize(
         self, text: str, voice: str, rate: float = 1.0, pitch: int = 0
     ) -> AsyncIterator[bytes]:
-        """Émet l'audio (MP3) par blocs. Lève `TTSError` en cas de problème.
+        """Émet l'audio (voir `audio_format`) par blocs. Lève `TTSError` en cas de problème.
 
         `rate` : vitesse (1.0 = normale) ; `pitch` : décalage en Hz relatifs.
         """

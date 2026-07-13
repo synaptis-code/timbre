@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, ValidationError
 
 from timbre.personas.models import Persona, VoiceConfig, VoiceParams
-from timbre.plugins.base import LLMError
+from timbre.plugins.base import LLMError, TTSError
 from timbre.plugins.llm.providers import (
     ACTIVE_KEY,
     PROVIDERS,
@@ -18,6 +18,8 @@ from timbre.plugins.llm.providers import (
     ProviderManager,
     config_key,
 )
+from timbre.plugins.tts.library import VoiceLibrary
+from timbre.plugins.tts.piper import SPECS_BY_ID as PIPER_SPECS_BY_ID
 from timbre.storage import ConversationMeta, Storage, StoredMessage
 
 router = APIRouter(prefix="/api")
@@ -193,15 +195,85 @@ async def list_provider_models(
 
 # ── Personas ─────────────────────────────────────────────────────────────
 
-# Voix FR edge-tts proposées dans l'éditeur (id → libellé lisible).
-FRENCH_VOICES: list[dict[str, str]] = [
-    {"id": "fr-FR-VivienneMultilingualNeural", "label": "Vivienne · Multilingue (F)"},
+class VoiceOption(BaseModel):
+    """Une voix sélectionnable dans l'éditeur de personas (moteur + identifiant)."""
+
+    id: str
+    label: str
+    engine: str
+
+
+# Voix cloud edge-tts toujours disponibles (le moteur ne pèse rien en local).
+EDGE_VOICES: list[VoiceOption] = [
+    VoiceOption(
+        id="fr-FR-VivienneMultilingualNeural", label="Vivienne · Multilingue", engine="edge-tts"
+    ),
 ]
 
 
+def _library(request: Request) -> VoiceLibrary:
+    library: VoiceLibrary = request.app.state.voice_library
+    return library
+
+
 @router.get("/voices")
-def list_voices() -> list[dict[str, str]]:
-    return FRENCH_VOICES
+def list_voices(request: Request) -> list[VoiceOption]:
+    """Voix sélectionnables = Vivienne + voix Piper effectivement téléchargées."""
+    ready = _library(request).ready_voice_ids()
+    piper = [
+        VoiceOption(id=vid, label=f"{PIPER_SPECS_BY_ID[vid].label} · Piper", engine="piper")
+        for vid in ready
+    ]
+    return [*EDGE_VOICES, *piper]
+
+
+class PiperVoiceInfo(BaseModel):
+    id: str
+    label: str
+    gender: str
+    size_bytes: int
+    recommended: bool
+    status: str  # available | downloading | ready | error
+    received: int
+    error: str | None
+
+
+class PiperLibrary(BaseModel):
+    package_installed: bool
+    voices: list[PiperVoiceInfo]
+
+
+def _piper_library(request: Request) -> PiperLibrary:
+    library = _library(request)
+    return PiperLibrary(
+        package_installed=library.package_installed,
+        voices=[PiperVoiceInfo(**vars(state)) for state in library.voice_states()],
+    )
+
+
+@router.get("/voices/piper")
+def get_piper_library(request: Request) -> PiperLibrary:
+    return _piper_library(request)
+
+
+@router.post("/voices/piper/{voice_id}/download", status_code=202)
+async def download_piper_voice(request: Request, voice_id: str) -> PiperLibrary:
+    try:
+        await _library(request).start_download(voice_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Voix Piper inconnue.") from exc
+    except TTSError as exc:
+        raise HTTPException(status_code=400, detail=exc.message) from exc
+    return _piper_library(request)
+
+
+@router.delete("/voices/piper/{voice_id}")
+def delete_piper_voice(request: Request, voice_id: str) -> PiperLibrary:
+    try:
+        _library(request).delete_voice(voice_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Voix Piper inconnue.") from exc
+    return _piper_library(request)
 
 
 class PersonaPayload(BaseModel):
@@ -222,11 +294,15 @@ def _slugify(name: str) -> str:
 
 
 def _build_persona(persona_id: str, payload: PersonaPayload) -> Persona:
+    # Le moteur découle de la voix choisie : une voix Piper → moteur « piper »,
+    # sinon edge-tts (Vivienne). L'UI n'a pas à gérer le moteur explicitement.
+    engine = "piper" if payload.voice_id in PIPER_SPECS_BY_ID else "edge-tts"
     return Persona(
         id=persona_id,
         name=payload.name,
         system_prompt=payload.system_prompt,
         voice=VoiceConfig(
+            engine=engine,
             voice_id=payload.voice_id,
             params=VoiceParams(rate=payload.rate, pitch=payload.pitch),
         ),

@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     # TTS (edge-tts par défaut ; deviendra un choix de plugin avec les personas)
     tts_enabled: bool = True
     tts_voice: str = "fr-FR-VivienneMultilingualNeural"
+    # Voix Piper locales téléchargées à la demande (fichiers .onnx). Hors du repo.
+    piper_voices_dir: str = "voices/piper"
 
     # Personas (stockés en base locale ; créés/édités depuis l'UI)
     persona: str = "timbre"  # persona actif par défaut à la connexion
