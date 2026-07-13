@@ -276,7 +276,7 @@ def delete_piper_voice(request: Request, voice_id: str) -> PiperLibrary:
     return _piper_library(request)
 
 
-_PREVIEW_TEXT = "Bonjour ! Voici un aperçu de ma voix."
+_PREVIEW_TEXT = "Hello! This is a preview of my voice. How do I sound?"
 
 
 @router.get("/voices/{voice_id}/preview")
