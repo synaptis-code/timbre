@@ -1475,6 +1475,52 @@ a.btn-secondary {
   opacity: 0.72;
 }
 
+.voice-engine-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Bouton d'aperçu « écouter » (▶) — pastille discrète */
+.voice-preview-btn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--hairline);
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.voice-preview-btn:hover:not(:disabled) {
+  background: var(--surface-soft);
+}
+
+.voice-preview-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Sélecteur de voix + bouton d'aperçu côte à côte (éditeur de personas) */
+.voice-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.voice-picker select {
+  flex: 1;
+  min-width: 0;
+}
+
 /* Liste des voix Piper téléchargeables */
 .piper-voices {
   display: flex;

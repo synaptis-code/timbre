@@ -6,7 +6,7 @@ machine et ne sont jamais renvoyées par l'API (seulement un indicateur).
 
 import re
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field, ValidationError
 
 from timbre.personas.models import Persona, VoiceConfig, VoiceParams
@@ -274,6 +274,28 @@ def delete_piper_voice(request: Request, voice_id: str) -> PiperLibrary:
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Voix Piper inconnue.") from exc
     return _piper_library(request)
+
+
+_PREVIEW_TEXT = "Bonjour ! Voici un aperçu de ma voix."
+
+
+@router.get("/voices/{voice_id}/preview")
+async def preview_voice(request: Request, voice_id: str) -> Response:
+    """Synthétise une courte phrase avec la voix demandée (aperçu à l'écoute)."""
+    orchestrator = request.app.state.orchestrator
+    engine_name = "piper" if voice_id in PIPER_SPECS_BY_ID else "edge-tts"
+    engine = orchestrator.tts_engine(engine_name)
+    if engine is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Moteur de voix indisponible (voix non téléchargée ?).",
+        )
+    try:
+        audio = b"".join([chunk async for chunk in engine.synthesize(_PREVIEW_TEXT, voice_id)])
+    except TTSError as exc:
+        raise HTTPException(status_code=400, detail=exc.message) from exc
+    media_type = "audio/wav" if engine.audio_format == "wav" else "audio/mpeg"
+    return Response(content=audio, media_type=media_type)
 
 
 class PersonaPayload(BaseModel):

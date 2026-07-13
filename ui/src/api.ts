@@ -1,6 +1,7 @@
 /** Client de l'API REST locale (conversations, historique, réglages). */
 
-const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://127.0.0.1:8765";
+export const API_BASE =
+  (import.meta.env.VITE_API_URL as string | undefined) ?? "http://127.0.0.1:8765";
 
 export interface ConversationMeta {
   id: string;

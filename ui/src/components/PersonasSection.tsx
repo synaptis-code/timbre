@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type Persona, type PersonaPayload, type VoiceOption } from "../api";
 import { PlusIcon, TrashIcon } from "../icons";
+import { previewVoice } from "../voicePreview";
 
 interface Draft extends PersonaPayload {
   id: string | null; // null = création
@@ -38,6 +39,14 @@ export function PersonasSection() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [feedback, setFeedback] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+
+  const listen = (voiceId: string) => {
+    setPreviewing(true);
+    previewVoice(voiceId)
+      .catch(() => setFeedback({ kind: "error", text: "Aperçu de la voix indisponible." }))
+      .finally(() => setPreviewing(false));
+  };
 
   const load = () => api.listPersonas().then(setPersonas);
 
@@ -138,13 +147,28 @@ export function PersonasSection() {
           <div className="persona-editor-row">
             <label className="provider-field">
               <span>Voix</span>
-              <select value={draft.voice_id} onChange={(event) => set("voice_id", event.target.value)}>
-                {voices.map((voice) => (
-                  <option key={voice.id} value={voice.id}>
-                    {voice.label}
-                  </option>
-                ))}
-              </select>
+              <div className="voice-picker">
+                <select
+                  value={draft.voice_id}
+                  onChange={(event) => set("voice_id", event.target.value)}
+                >
+                  {voices.map((voice) => (
+                    <option key={voice.id} value={voice.id}>
+                      {voice.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="voice-preview-btn"
+                  onClick={() => listen(draft.voice_id)}
+                  disabled={previewing}
+                  title="Écouter un aperçu"
+                  aria-label="Écouter un aperçu de la voix"
+                >
+                  {previewing ? "…" : "▶"}
+                </button>
+              </div>
             </label>
             <label className="provider-field persona-field-sm">
               <span>Débit · {draft.rate.toFixed(2)}</span>

@@ -77,6 +77,20 @@ def test_shared_model_makes_both_speakers_ready(tmp_path: Path) -> None:
     assert by_id["fr_FR-upmc-pierre"]["status"] == "ready"
 
 
+def test_preview_vivienne_returns_audio(tmp_path: Path) -> None:
+    with make_client(tmp_path) as client:
+        resp = client.get("/api/voices/fr-FR-VivienneMultilingualNeural/preview")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("audio/mpeg")
+    assert resp.content.startswith(b"AUDIO(")  # FakeTTS
+
+
+def test_preview_undownloaded_piper_voice_is_400(tmp_path: Path) -> None:
+    with make_client(tmp_path) as client:
+        resp = client.get("/api/voices/fr_FR-siwis-medium/preview")
+    assert resp.status_code == 400
+
+
 def test_persona_with_piper_voice_gets_piper_engine(tmp_path: Path) -> None:
     with make_client(tmp_path) as client:
         piper_persona = client.post(

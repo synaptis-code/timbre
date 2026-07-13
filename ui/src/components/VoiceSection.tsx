@@ -1,5 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type PiperLibrary, type PiperVoiceInfo } from "../api";
+import { previewVoice } from "../voicePreview";
+
+function PreviewButton({
+  voiceId,
+  previewing,
+  onPreview,
+}: {
+  voiceId: string;
+  previewing: string | null;
+  onPreview: (id: string) => void;
+}) {
+  const active = previewing === voiceId;
+  return (
+    <button
+      type="button"
+      className="voice-preview-btn"
+      onClick={() => onPreview(voiceId)}
+      disabled={previewing !== null}
+      title="Écouter un aperçu"
+      aria-label="Écouter un aperçu de la voix"
+    >
+      {active ? "…" : "▶"}
+    </button>
+  );
+}
 
 interface EngineBadge {
   label: string;
@@ -41,13 +66,17 @@ const formatMo = (bytes: number) => `${Math.round(bytes / 1_000_000)} Mo`;
 function PiperVoiceRow({
   voice,
   busy,
+  previewing,
   onDownload,
   onDelete,
+  onPreview,
 }: {
   voice: PiperVoiceInfo;
   busy: boolean;
+  previewing: string | null;
   onDownload: (id: string) => void;
   onDelete: (id: string) => void;
+  onPreview: (id: string) => void;
 }) {
   const percent =
     voice.status === "downloading" && voice.size_bytes > 0
@@ -67,6 +96,7 @@ function PiperVoiceRow({
       {voice.status === "ready" && (
         <div className="piper-voice-action">
           <span className="piper-voice-ready">✓ Installée</span>
+          <PreviewButton voiceId={voice.id} previewing={previewing} onPreview={onPreview} />
           <button
             type="button"
             className="piper-link-danger"
@@ -112,7 +142,15 @@ export function VoiceSection() {
   const [piper, setPiper] = useState<PiperLibrary | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
+
+  const preview = useCallback((voiceId: string) => {
+    setPreviewing(voiceId);
+    previewVoice(voiceId)
+      .catch(() => setFailed("Aperçu de la voix indisponible."))
+      .finally(() => setPreviewing(null));
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -187,7 +225,14 @@ export function VoiceSection() {
               <h2 className="voice-engine-name">Vivienne</h2>
               <p className="voice-engine-tagline">La voix par défaut, prête à l'emploi</p>
             </div>
-            <span className="voice-engine-state voice-engine-state--active">Active</span>
+            <div className="voice-engine-head-actions">
+              <PreviewButton
+                voiceId="fr-FR-VivienneMultilingualNeural"
+                previewing={previewing}
+                onPreview={preview}
+              />
+              <span className="voice-engine-state voice-engine-state--active">Active</span>
+            </div>
           </div>
           <p className="voice-engine-desc">
             Voix neurale de Microsoft, très naturelle et à faible latence. Multilingue
@@ -221,8 +266,10 @@ export function VoiceSection() {
                   key={voice.id}
                   voice={voice}
                   busy={busy}
+                  previewing={previewing}
                   onDownload={download}
                   onDelete={remove}
+                  onPreview={preview}
                 />
               ))
             )}
