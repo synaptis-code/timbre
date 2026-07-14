@@ -23,9 +23,9 @@ class FasterWhisperASR(ASRBackend):
     def __init__(
         self,
         model: str = "large-v3-turbo",
-        device: str = "cuda",
+        device: str = "cpu",
         compute_type: str | None = None,
-        language: str = "fr",
+        language: str | None = None,
     ) -> None:
         self._model_name = model
         self._device = device
@@ -95,7 +95,7 @@ class FasterWhisperASR(ASRBackend):
     def _transcribe_sync(self, model: "WhisperModel", audio: bytes) -> str:
         segments, _info = model.transcribe(
             io.BytesIO(audio),
-            language=self._language,
+            language=self._language or None,  # None = détection automatique
             beam_size=1,  # latence d'abord (§14) ; la voix est courte et proche
             condition_on_previous_text=False,
         )

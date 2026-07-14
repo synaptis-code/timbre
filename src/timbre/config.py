@@ -21,8 +21,11 @@ class Settings(BaseSettings):
     # ASR (faster-whisper — nécessite `uv sync --extra asr`)
     asr_enabled: bool = True
     asr_model: str = "large-v3-turbo"
-    asr_device: str = "cuda"  # "cpu" si pas de GPU NVIDIA ou VRAM saturée
-    asr_language: str = "fr"
+    # CPU par défaut : robuste (aucun GPU requis) et laisse la VRAM au LLM/TTS.
+    # "cuda" pour une transcription plus rapide si le GPU a de la marge.
+    asr_device: str = "cpu"
+    # "" = détection automatique de la langue parlée (français, anglais…).
+    asr_language: str = ""
 
     # TTS (edge-tts par défaut ; deviendra un choix de plugin avec les personas)
     tts_enabled: bool = True

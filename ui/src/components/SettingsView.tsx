@@ -152,8 +152,8 @@ export function SettingsView({
                     onChange={(event) => onSetAsrDevice(event.target.value as "cuda" | "cpu")}
                     aria-label="Périphérique Whisper"
                   >
-                    <option value="cuda">GPU (cuda)</option>
-                    <option value="cpu">CPU</option>
+                    <option value="cpu">CPU (recommandé)</option>
+                    <option value="cuda">GPU (NVIDIA)</option>
                   </select>
                 </div>
               )}
