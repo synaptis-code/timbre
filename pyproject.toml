@@ -30,12 +30,6 @@ asr = [
 piper = [
     "piper-tts>=1.4",
 ]
-# Voix expressive Orpheus (émotions). LOURD (torch), installé à la demande.
-# Le modèle Orpheus tourne en GGUF dans LM Studio ; `snac` décode l'audio.
-orpheus = [
-    "torch>=2.2",
-    "snac>=1.2",
-]
 
 [project.scripts]
 timbre = "timbre.__main__:main"
@@ -85,7 +79,7 @@ mypy_path = "src"
 packages = ["timbre"]
 
 [[tool.mypy.overrides]]
-module = ["faster_whisper.*", "piper.*", "snac.*", "torch.*"]
+module = ["faster_whisper.*", "piper.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

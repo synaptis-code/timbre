@@ -4,7 +4,6 @@ Tout est persisté en SQLite local — les clés API ne quittent jamais la
 machine et ne sont jamais renvoyées par l'API (seulement un indicateur).
 """
 
-import asyncio
 import re
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -20,12 +19,6 @@ from timbre.plugins.llm.providers import (
     config_key,
 )
 from timbre.plugins.tts.library import VoiceLibrary
-from timbre.plugins.tts.orpheus import (
-    ORPHEUS_VOICES,
-    OrpheusTTSBackend,
-    ensure_orpheus_installed,
-    orpheus_ready,
-)
 from timbre.storage import ConversationMeta, Storage, StoredMessage
 
 router = APIRouter(prefix="/api")
@@ -227,8 +220,6 @@ def voice_engine(voice_id: str) -> str:
     """
     if voice_id in EDGE_VOICE_IDS:
         return "edge-tts"
-    if voice_id.startswith("orpheus-"):
-        return "orpheus"
     return "piper" if "_" in voice_id else "edge-tts"
 
 
@@ -239,65 +230,13 @@ def _library(request: Request) -> VoiceLibrary:
 
 @router.get("/voices")
 async def list_voices(request: Request) -> list[VoiceOption]:
-    """Voix sélectionnables = Vivienne + voix Piper téléchargées + Orpheus si activé."""
+    """Voix sélectionnables = Vivienne + voix Piper effectivement téléchargées."""
     library = _library(request)
     piper = [
         VoiceOption(id=vid, label=f"{await library.label_for(vid)} · Piper", engine="piper")
         for vid in library.ready_voice_ids()
     ]
-    orpheus: list[VoiceOption] = []
-    if request.app.state.orchestrator.tts_engine("orpheus") is not None:
-        orpheus = [
-            VoiceOption(id=f"orpheus-{name}", label=f"{name.title()} · Orpheus", engine="orpheus")
-            for name in ORPHEUS_VOICES
-        ]
-    return [*EDGE_VOICES, *piper, *orpheus]
-
-
-class OrpheusStatus(BaseModel):
-    ready: bool  # torch + snac installés
-    enabled: bool  # moteur enregistré (modèle configuré)
-    model: str
-    voices: list[str]
-
-
-def _orpheus_status(request: Request, model: str) -> OrpheusStatus:
-    enabled = request.app.state.orchestrator.tts_engine("orpheus") is not None
-    return OrpheusStatus(
-        ready=orpheus_ready(), enabled=enabled, model=model, voices=list(ORPHEUS_VOICES)
-    )
-
-
-@router.get("/voices/orpheus")
-async def get_orpheus(request: Request) -> OrpheusStatus:
-    model = await _storage(request).get_setting("orpheus_model", "")
-    return _orpheus_status(request, model)
-
-
-class OrpheusPayload(BaseModel):
-    model: str = Field(min_length=1, max_length=200)
-
-
-@router.post("/voices/orpheus")
-async def enable_orpheus(request: Request, payload: OrpheusPayload) -> OrpheusStatus:
-    """Installe torch+snac (à la demande), enregistre le moteur, persiste le modèle."""
-    try:
-        await asyncio.to_thread(ensure_orpheus_installed)
-    except TTSError as exc:
-        raise HTTPException(status_code=400, detail=exc.message) from exc
-    await _storage(request).set_setting("orpheus_model", payload.model)
-    base_url = request.app.state.settings.lmstudio_base_url
-    request.app.state.orchestrator.set_tts_engine(
-        "orpheus", OrpheusTTSBackend(base_url, payload.model)
-    )
-    return _orpheus_status(request, payload.model)
-
-
-@router.delete("/voices/orpheus")
-async def disable_orpheus(request: Request) -> OrpheusStatus:
-    await _storage(request).set_setting("orpheus_model", "")
-    request.app.state.orchestrator.remove_tts_engine("orpheus")
-    return _orpheus_status(request, "")
+    return [*EDGE_VOICES, *piper]
 
 
 class PiperVoiceInfo(BaseModel):

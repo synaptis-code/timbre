@@ -2,7 +2,7 @@
 
 Moteur par défaut du MVP pour valider le pipeline (§1 du plan). ⚠️ Exception
 assumée au local-first : edge-tts envoie le texte au service Edge de Microsoft.
-Les moteurs expressifs 100 % locaux (Orpheus, Chatterbox…) se brancheront sur
+Les moteurs 100 % locaux (Piper, Kokoro, Chatterbox…) se branchent sur
 la même interface `TTSBackend` aux phases suivantes.
 """
 

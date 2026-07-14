@@ -19,7 +19,6 @@ from timbre.plugins.base import ASRBackend, LLMBackend, TTSBackend
 from timbre.plugins.llm.providers import ProviderManager
 from timbre.plugins.tts.edge import EdgeTTSBackend
 from timbre.plugins.tts.library import VoiceLibrary
-from timbre.plugins.tts.orpheus import OrpheusTTSBackend, orpheus_ready
 from timbre.plugins.tts.piper import PiperTTSBackend, piper_installed
 from timbre.storage import Storage
 
@@ -75,12 +74,6 @@ def create_app(
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await storage.connect()
         await llm_manager.reload()
-        # Ré-activer Orpheus si un modèle a été configuré et les deps sont là.
-        orpheus_model = await storage.get_setting("orpheus_model", "")
-        if orpheus_model and orpheus_ready():
-            orchestrator.set_tts_engine(
-                "orpheus", OrpheusTTSBackend(app_settings.lmstudio_base_url, orpheus_model)
-            )
         yield
         await storage.aclose()
         await llm_manager.aclose()

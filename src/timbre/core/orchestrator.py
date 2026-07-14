@@ -143,11 +143,11 @@ class Orchestrator:
         return self._tts_engines.get(name)
 
     def set_tts_engine(self, name: str, backend: TTSBackend) -> None:
-        """Enregistre/remplace un moteur TTS (ex. Orpheus (ré)activé)."""
+        """Enregistre/remplace un moteur TTS à chaud (ex. Kokoro après installation)."""
         self._tts_engines[name] = backend
 
     def remove_tts_engine(self, name: str) -> None:
-        """Retire un moteur TTS (ex. Orpheus désactivé)."""
+        """Retire un moteur TTS (ex. moteur local désinstallé)."""
         self._tts_engines.pop(name, None)
 
     # ── ASR (device) ────────────────────────────────────────────────────────
