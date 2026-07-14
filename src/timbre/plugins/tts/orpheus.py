@@ -186,8 +186,11 @@ class OrpheusTTSBackend(TTSBackend):
                     piece = chunk.get("choices", [{}])[0].get("text", "")
                     if not piece:
                         continue
+                    # Les jetons de contrôle en tête (start/end) décodent en
+                    # négatif : ne garder que les vrais jetons audio (> 0) garde
+                    # aussi l'index aligné sur le cycle de 7 codebooks.
                     token_id = _token_to_id(piece, index)
-                    if token_id is not None:
+                    if token_id is not None and token_id > 0:
                         token_ids.append(token_id)
                         index += 1
         except httpx2.HTTPError as exc:
