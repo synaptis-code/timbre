@@ -18,7 +18,7 @@ from timbre.plugins.llm.providers import (
     ProviderManager,
     config_key,
 )
-from timbre.plugins.tts.library import VoiceLibrary
+from timbre.plugins.tts.library import KokoroLibrary, VoiceLibrary
 from timbre.storage import ConversationMeta, Storage, StoredMessage
 
 router = APIRouter(prefix="/api")
@@ -220,6 +220,8 @@ def voice_engine(voice_id: str) -> str:
     """
     if voice_id in EDGE_VOICE_IDS:
         return "edge-tts"
+    if voice_id.startswith("kokoro-"):
+        return "kokoro"
     return "piper" if "_" in voice_id else "edge-tts"
 
 
@@ -228,15 +230,26 @@ def _library(request: Request) -> VoiceLibrary:
     return library
 
 
+def _kokoro_library(request: Request) -> KokoroLibrary:
+    library: KokoroLibrary = request.app.state.kokoro_library
+    return library
+
+
 @router.get("/voices")
 async def list_voices(request: Request) -> list[VoiceOption]:
-    """Voix sélectionnables = Vivienne + voix Piper effectivement téléchargées."""
+    """Voix = Vivienne + voix Piper téléchargées + voix Kokoro si installé."""
     library = _library(request)
     piper = [
         VoiceOption(id=vid, label=f"{await library.label_for(vid)} · Piper", engine="piper")
         for vid in library.ready_voice_ids()
     ]
-    return [*EDGE_VOICES, *piper]
+    kokoro: list[VoiceOption] = []
+    if request.app.state.orchestrator.tts_engine("kokoro") is not None:
+        kokoro = [
+            VoiceOption(id=v.id, label=f"{v.label} · Kokoro", engine="kokoro")
+            for v in _kokoro_library(request).voices()
+        ]
+    return [*EDGE_VOICES, *piper, *kokoro]
 
 
 class PiperVoiceInfo(BaseModel):
@@ -290,6 +303,57 @@ async def delete_piper_voice(request: Request, voice_id: str) -> PiperLibrary:
     return await _piper_library(request)
 
 
+# ── Kokoro (un seul téléchargement débloque toutes les voix) ──────────────────
+
+class KokoroVoiceInfo(BaseModel):
+    id: str
+    label: str
+    gender: str
+    language_english: str
+    language_native: str
+
+
+class KokoroLibraryInfo(BaseModel):
+    status: str  # available | downloading | ready | error
+    received: int
+    total: int
+    error: str | None
+    voices: list[KokoroVoiceInfo]
+
+
+def _kokoro_info(request: Request) -> KokoroLibraryInfo:
+    library = _kokoro_library(request)
+    status, received, total, error = library.status()
+    return KokoroLibraryInfo(
+        status=status,
+        received=received,
+        total=total,
+        error=error,
+        voices=[KokoroVoiceInfo(**vars(v)) for v in library.voices()],
+    )
+
+
+@router.get("/voices/kokoro")
+def get_kokoro(request: Request) -> KokoroLibraryInfo:
+    return _kokoro_info(request)
+
+
+@router.post("/voices/kokoro/install", status_code=202)
+async def install_kokoro(request: Request) -> KokoroLibraryInfo:
+    try:
+        await _kokoro_library(request).install()
+    except TTSError as exc:
+        raise HTTPException(status_code=400, detail=exc.message) from exc
+    return _kokoro_info(request)
+
+
+@router.delete("/voices/kokoro")
+def uninstall_kokoro(request: Request) -> KokoroLibraryInfo:
+    _kokoro_library(request).uninstall()
+    request.app.state.orchestrator.remove_tts_engine("kokoro")
+    return _kokoro_info(request)
+
+
 # Phrase d'aperçu par famille de langue (« Bonjour, voici un aperçu de ma voix »).
 # Repli anglais pour les langues non listées. La famille est déduite de l'id de la
 # voix : « de_DE-thorsten-medium » → « de », « fr-FR-VivienneMultilingual » → « fr ».
@@ -331,7 +395,12 @@ _PREVIEW_DEFAULT = _PREVIEW_TEXTS["en"]
 
 def preview_text(voice_id: str) -> str:
     """Phrase d'aperçu dans la langue de la voix (repli anglais)."""
-    family = voice_id.split("-", 1)[0].split("_", 1)[0].lower()
+    if voice_id.startswith("kokoro-"):
+        from timbre.plugins.tts.kokoro import voice_lang_family
+
+        family = voice_lang_family(voice_id)
+    else:
+        family = voice_id.split("-", 1)[0].split("_", 1)[0].lower()
     return _PREVIEW_TEXTS.get(family, _PREVIEW_DEFAULT)
 
 

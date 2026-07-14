@@ -99,6 +99,22 @@ export interface PiperLibrary {
   voices: PiperVoiceInfo[];
 }
 
+export interface KokoroVoiceInfo {
+  id: string;
+  label: string;
+  gender: string;
+  language_english: string;
+  language_native: string;
+}
+
+export interface KokoroLibrary {
+  status: "available" | "downloading" | "ready" | "error";
+  received: number;
+  total: number;
+  error: string | null;
+  voices: KokoroVoiceInfo[];
+}
+
 
 export const api = {
   listConversations: () => request<ConversationMeta[]>("/api/conversations"),
@@ -139,6 +155,9 @@ export const api = {
     request<PiperLibrary>(`/api/voices/piper/${voiceId}/download`, { method: "POST" }),
   deletePiperVoice: (voiceId: string) =>
     request<PiperLibrary>(`/api/voices/piper/${voiceId}`, { method: "DELETE" }),
+  getKokoro: () => request<KokoroLibrary>("/api/voices/kokoro"),
+  installKokoro: () => request<KokoroLibrary>("/api/voices/kokoro/install", { method: "POST" }),
+  uninstallKokoro: () => request<KokoroLibrary>("/api/voices/kokoro", { method: "DELETE" }),
   getSettings: () => request<{ language: string }>("/api/settings"),
   putSettings: (language: string) =>
     request<{ language: string }>("/api/settings", {

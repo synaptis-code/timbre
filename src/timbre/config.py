@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     tts_voice: str = "fr-FR-VivienneMultilingualNeural"
     # Voix Piper locales téléchargées à la demande (fichiers .onnx). Hors du repo.
     piper_voices_dir: str = "voices/piper"
+    # Modèle Kokoro (onnx + banque de voix), téléchargé à la demande. Hors du repo.
+    kokoro_models_dir: str = "voices/kokoro"
 
     # Personas (stockés en base locale ; créés/édités depuis l'UI)
     persona: str = "timbre"  # persona actif par défaut à la connexion

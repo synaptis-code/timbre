@@ -1580,7 +1580,78 @@ a.btn-secondary {
 }
 
 .voice-modal .piper-search {
+  margin-top: 4px;
+}
+
+/* Onglets de catégorie (Kokoro / Piper / Chatterbox) */
+.voice-tabs {
+  display: flex;
+  gap: 8px;
   margin-top: 16px;
+}
+
+.voice-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  padding: 10px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--canvas);
+  cursor: pointer;
+  text-align: left;
+}
+
+.voice-tab--on {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.voice-tab-name {
+  font-size: 14px;
+  font-weight: 540;
+  color: var(--ink);
+}
+
+.voice-tab-hint {
+  font-size: 11px;
+  opacity: 0.6;
+  color: var(--ink);
+}
+
+.voice-tab--on .voice-tab-name,
+.voice-tab--on .voice-tab-hint {
+  color: var(--canvas);
+}
+
+.tab-intro {
+  font-size: 13px;
+  font-weight: 380;
+  opacity: 0.7;
+  margin: 14px 0 4px;
+  max-width: 58ch;
+}
+
+.kokoro-installed-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.kokoro-install {
+  padding: 8px 0;
+}
+
+.tab-soon {
+  padding: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
 }
 
 .voice-engine-head-actions {

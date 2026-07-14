@@ -18,7 +18,8 @@ from timbre.plugins.asr.whisper import FasterWhisperASR
 from timbre.plugins.base import ASRBackend, LLMBackend, TTSBackend
 from timbre.plugins.llm.providers import ProviderManager
 from timbre.plugins.tts.edge import EdgeTTSBackend
-from timbre.plugins.tts.library import VoiceLibrary
+from timbre.plugins.tts.kokoro import KokoroTTSBackend, kokoro_installed, model_present
+from timbre.plugins.tts.library import KokoroLibrary, VoiceLibrary
 from timbre.plugins.tts.piper import PiperTTSBackend, piper_installed
 from timbre.storage import Storage
 
@@ -45,6 +46,10 @@ def create_app(
     piper_dir = Path(app_settings.piper_voices_dir)
     if piper_installed():
         tts_engines["piper"] = PiperTTSBackend(piper_dir)
+    # Moteur Kokoro : enregistré d'emblée si le paquet et le modèle sont présents.
+    kokoro_dir = Path(app_settings.kokoro_models_dir)
+    if kokoro_installed() and model_present(kokoro_dir):
+        tts_engines["kokoro"] = KokoroTTSBackend(kokoro_dir)
     asr_backend = (
         asr
         if asr is not None
@@ -102,6 +107,12 @@ def create_app(
         piper_dir,
         on_engine_ready=lambda: orchestrator.register_tts_engine(
             "piper", PiperTTSBackend(piper_dir)
+        ),
+    )
+    app.state.kokoro_library = KokoroLibrary(
+        kokoro_dir,
+        on_engine_ready=lambda: orchestrator.set_tts_engine(
+            "kokoro", KokoroTTSBackend(kokoro_dir)
         ),
     )
     app.include_router(ws_router)

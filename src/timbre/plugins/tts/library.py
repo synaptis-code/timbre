@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from timbre.plugins.tts import piper
+from timbre.plugins.tts import kokoro, piper
 from timbre.plugins.tts.piper import PiperVoiceSpec, derive_label
 
 logger = logging.getLogger(__name__)
@@ -158,4 +158,87 @@ class VoiceLibrary:
                 path.unlink()
                 removed = True
         self._errors.pop(voice_id, None)
+        return removed
+
+
+@dataclass(frozen=True)
+class KokoroVoiceInfo:
+    id: str  # préfixé « kokoro-… »
+    label: str
+    gender: str
+    language_english: str
+    language_native: str
+
+
+class KokoroLibrary:
+    """Kokoro = un seul téléchargement (modèle + banque de voix) qui débloque
+    toutes les voix. Pas de gestion par voix (contrairement à Piper)."""
+
+    def __init__(self, models_dir: Path, on_engine_ready: Callable[[], None]) -> None:
+        self._dir = models_dir
+        self._on_ready = on_engine_ready
+        self._download: _Download | None = None
+        self._error: str | None = None
+        self._task: asyncio.Task[None] | None = None
+
+    @property
+    def installed(self) -> bool:
+        return kokoro.kokoro_installed() and kokoro.model_present(self._dir)
+
+    def voices(self) -> list[KokoroVoiceInfo]:
+        return [
+            KokoroVoiceInfo(
+                id=f"kokoro-{v.id}",
+                label=v.label,
+                gender=v.gender,
+                language_english=v.language_english,
+                language_native=v.language_native,
+            )
+            for v in kokoro.voice_catalog()
+        ]
+
+    def status(self) -> tuple[VoiceStatus, int, int, str | None]:
+        total = kokoro.MODEL_TOTAL_SIZE
+        if self.installed:
+            return "ready", total, total, None
+        if self._download is not None:
+            return "downloading", self._download.received, self._download.total, None
+        if self._error is not None:
+            return "error", 0, total, self._error
+        return "available", 0, total, None
+
+    async def install(self) -> None:
+        """Installe le paquet (si besoin) puis télécharge le modèle en tâche de fond."""
+        if self.installed or self._download is not None:
+            return
+        await asyncio.to_thread(kokoro.ensure_kokoro_installed)
+        self._error = None
+        self._download = _Download(received=0, total=kokoro.MODEL_TOTAL_SIZE)
+        self._task = asyncio.create_task(self._run())
+
+    async def _run(self) -> None:
+        def progress(received: int, total: int) -> None:
+            if self._download is not None:
+                self._download.received = received
+                self._download.total = total
+
+        try:
+            await asyncio.to_thread(kokoro.download_model, self._dir, progress)
+            logger.info("Modèle Kokoro téléchargé.")
+            self._on_ready()
+        except Exception as exc:  # pragma: no cover - dépend du réseau
+            logger.exception("Téléchargement de Kokoro échoué")
+            self._error = str(exc)
+        finally:
+            self._download = None
+            self._task = None
+
+    def uninstall(self) -> bool:
+        removed = False
+        for name in (kokoro.MODEL_FILE, kokoro.VOICES_FILE):
+            path = self._dir / name
+            if path.exists():
+                path.unlink()
+                removed = True
+        self._error = None
         return removed

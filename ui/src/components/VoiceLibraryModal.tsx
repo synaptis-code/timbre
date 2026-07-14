@@ -1,106 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { api, type PiperLibrary, type PiperVoiceInfo } from "../api";
-import { previewVoice } from "../voicePreview";
+import { KokoroTab } from "./KokoroTab";
+import { PiperTab } from "./PiperTab";
 
-function PreviewButton({
-  voiceId,
-  previewing,
-  onPreview,
-}: {
-  voiceId: string;
-  previewing: string | null;
-  onPreview: (id: string) => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="voice-preview-btn"
-      onClick={() => onPreview(voiceId)}
-      disabled={previewing !== null}
-      title="Écouter un aperçu"
-      aria-label="Écouter un aperçu de la voix"
-    >
-      {previewing === voiceId ? "…" : "▶"}
-    </button>
-  );
-}
+type Category = "piper" | "kokoro" | "chatterbox";
 
-const formatMo = (bytes: number) => `${Math.round(bytes / 1_000_000)} Mo`;
-
-interface RowProps {
-  voice: PiperVoiceInfo;
-  busy: boolean;
-  previewing: string | null;
-  onDownload: (id: string) => void;
-  onDelete: (id: string) => void;
-  onPreview: (id: string) => void;
-}
-
-function PiperVoiceRow({ voice, busy, previewing, onDownload, onDelete, onPreview }: RowProps) {
-  const percent =
-    voice.status === "downloading" && voice.size_bytes > 0
-      ? Math.min(100, Math.round((voice.received / voice.size_bytes) * 100))
-      : 0;
-
-  return (
-    <div className="piper-voice">
-      <div className="piper-voice-info">
-        <span className="piper-voice-name">{voice.label}</span>
-        <span className="piper-voice-meta">{formatMo(voice.size_bytes)}</span>
-      </div>
-
-      {voice.status === "ready" && (
-        <div className="piper-voice-action">
-          <span className="piper-voice-ready">✓ Installée</span>
-          <PreviewButton voiceId={voice.id} previewing={previewing} onPreview={onPreview} />
-          <button
-            type="button"
-            className="piper-link-danger"
-            onClick={() => onDelete(voice.id)}
-            disabled={busy}
-          >
-            Supprimer
-          </button>
-        </div>
-      )}
-
-      {voice.status === "downloading" && (
-        <div className="piper-progress">
-          <div className="piper-progress-track">
-            <div className="piper-progress-fill" style={{ width: `${percent}%` }} />
-          </div>
-          <span className="piper-progress-label">{percent}%</span>
-        </div>
-      )}
-
-      {(voice.status === "available" || voice.status === "error") && (
-        <div className="piper-voice-action">
-          {voice.status === "error" && (
-            <span className="piper-voice-error" title={voice.error ?? undefined}>
-              Échec
-            </span>
-          )}
-          <button
-            type="button"
-            className="btn-secondary btn-compact"
-            onClick={() => onDownload(voice.id)}
-            disabled={busy}
-          >
-            {voice.status === "error" ? "Réessayer" : "Télécharger"}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface LanguageGroup {
-  code: string;
-  native: string;
-  english: string;
-  voices: PiperVoiceInfo[];
-}
+const CATEGORIES: ReadonlyArray<readonly [Category, string, string]> = [
+  ["kokoro", "Kokoro", "Léger · naturel"],
+  ["piper", "Piper", "50 langues"],
+  ["chatterbox", "Chatterbox", "Expressif · GPU"],
+];
 
 export function VoiceLibraryModal({
   onClose,
@@ -109,36 +18,8 @@ export function VoiceLibraryModal({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const [piper, setPiper] = useState<PiperLibrary | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState<string | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
-  const [previewing, setPreviewing] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const pollRef = useRef<number | null>(null);
-  const wasDownloading = useRef(false);
+  const [category, setCategory] = useState<Category>("kokoro");
 
-  const preview = useCallback((voiceId: string) => {
-    setPreviewing(voiceId);
-    previewVoice(voiceId)
-      .catch(() => setFailed("Aperçu de la voix indisponible."))
-      .finally(() => setPreviewing(null));
-  }, []);
-
-  const refresh = useCallback(async () => {
-    try {
-      setPiper(await api.getPiperLibrary());
-      setLoadFailed(false);
-    } catch {
-      setLoadFailed(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  // Fermeture au clavier (Échap).
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -146,96 +27,6 @@ export function VoiceLibraryModal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-
-  const downloading = piper?.voices.some((v) => v.status === "downloading") ?? false;
-
-  // Un téléchargement vient de se terminer → rafraîchir les voix du persona.
-  useEffect(() => {
-    if (wasDownloading.current && !downloading) onChanged();
-    wasDownloading.current = downloading;
-  }, [downloading, onChanged]);
-
-  useEffect(() => {
-    if (!downloading) {
-      if (pollRef.current !== null) {
-        window.clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-      return;
-    }
-    if (pollRef.current === null) {
-      pollRef.current = window.setInterval(() => void refresh(), 1200);
-    }
-    return () => {
-      if (pollRef.current !== null) {
-        window.clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
-  }, [downloading, refresh]);
-
-  const download = useCallback(async (id: string) => {
-    setBusy(true);
-    setFailed(null);
-    try {
-      setPiper(await api.downloadPiperVoice(id));
-    } catch {
-      setFailed("Le téléchargement n'a pas pu démarrer.");
-    } finally {
-      setBusy(false);
-    }
-  }, []);
-
-  const remove = useCallback(
-    async (id: string) => {
-      setBusy(true);
-      setFailed(null);
-      try {
-        setPiper(await api.deletePiperVoice(id));
-        onChanged();
-      } catch {
-        setFailed("Suppression impossible.");
-      } finally {
-        setBusy(false);
-      }
-    },
-    [onChanged],
-  );
-
-  const installed = useMemo(
-    () => (piper?.voices ?? []).filter((v) => v.status === "ready" || v.status === "downloading"),
-    [piper],
-  );
-
-  const groups = useMemo<LanguageGroup[]>(() => {
-    const q = query.trim().toLowerCase();
-    const byLang = new Map<string, LanguageGroup>();
-    for (const voice of piper?.voices ?? []) {
-      const matches =
-        q === "" ||
-        voice.language_english.toLowerCase().includes(q) ||
-        voice.language_native.toLowerCase().includes(q) ||
-        voice.language_code.toLowerCase().includes(q) ||
-        voice.label.toLowerCase().includes(q);
-      if (!matches) continue;
-      let group = byLang.get(voice.language_code);
-      if (group === undefined) {
-        group = {
-          code: voice.language_code,
-          native: voice.language_native,
-          english: voice.language_english,
-          voices: [],
-        };
-        byLang.set(voice.language_code, group);
-      }
-      group.voices.push(voice);
-    }
-    return [...byLang.values()].sort(
-      (a, b) => b.voices.length - a.voices.length || a.english.localeCompare(b.english),
-    );
-  }, [piper, query]);
-
-  const rowProps = { busy, previewing, onDownload: download, onDelete: remove, onPreview: preview };
 
   return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
@@ -247,76 +38,39 @@ export function VoiceLibraryModal({
         aria-label="Bibliothèque de voix"
       >
         <div className="modal-head">
-          <div>
-            <h2 className="modal-title">Bibliothèque de voix</h2>
-            <p className="modal-intro">
-              Voix locales Piper — une cinquantaine de langues, 100 % hors-ligne. Vivienne
-              (cloud) reste toujours disponible.
-            </p>
-          </div>
+          <h2 className="modal-title">Bibliothèque de voix</h2>
           <button type="button" className="modal-close" onClick={onClose} aria-label="Fermer">
             ✕
           </button>
         </div>
 
-        <input
-          className="piper-search"
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Chercher une langue (français, english, español, deutsch…)"
-          aria-label="Chercher une langue"
-          autoFocus
-        />
+        <div className="voice-tabs" role="tablist">
+          {CATEGORIES.map(([id, label, hint]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={category === id}
+              className={`voice-tab ${category === id ? "voice-tab--on" : ""}`}
+              onClick={() => setCategory(id)}
+            >
+              <span className="voice-tab-name">{label}</span>
+              <span className="voice-tab-hint">{hint}</span>
+            </button>
+          ))}
+        </div>
 
         <div className="voice-modal-body">
-          {piper === null ? (
-            loadFailed ? (
-              <div className="piper-load-error">
-                <p className="piper-hint">Catalogue de voix indisponible.</p>
-                <button
-                  type="button"
-                  className="btn-secondary btn-compact"
-                  onClick={() => void refresh()}
-                >
-                  Réessayer
-                </button>
-              </div>
-            ) : (
-              <p className="piper-hint">Chargement du catalogue…</p>
-            )
-          ) : (
-            <>
-              {installed.length > 0 && query.trim() === "" && (
-                <div className="piper-installed">
-                  <p className="piper-group-label">Vos voix</p>
-                  {installed.map((voice) => (
-                    <PiperVoiceRow key={voice.id} voice={voice} {...rowProps} />
-                  ))}
-                </div>
-              )}
-
-              <div className="piper-langs">
-                {groups.length === 0 ? (
-                  <p className="piper-hint">Aucune langue ne correspond à « {query} ».</p>
-                ) : (
-                  groups.map((group) => (
-                    <details key={group.code} className="piper-lang" open={query.trim() !== ""}>
-                      <summary className="piper-lang-summary">
-                        <span className="piper-lang-name">{group.native}</span>
-                        <span className="piper-lang-count">{group.voices.length}</span>
-                      </summary>
-                      <div className="piper-lang-voices">
-                        {group.voices.map((voice) => (
-                          <PiperVoiceRow key={voice.id} voice={voice} {...rowProps} />
-                        ))}
-                      </div>
-                    </details>
-                  ))
-                )}
-              </div>
-              {failed !== null && <p className="piper-voice-error">{failed}</p>}
-            </>
+          {category === "kokoro" && <KokoroTab onChanged={onChanged} />}
+          {category === "piper" && <PiperTab onChanged={onChanged} />}
+          {category === "chatterbox" && (
+            <div className="tab-soon">
+              <p className="tab-intro">
+                Chatterbox — voix expressive avec émotions et clonage, ~25 langues. Plus lourd
+                (GPU). Intégration en cours.
+              </p>
+              <span className="voice-badge voice-badge--warn">Bientôt</span>
+            </div>
           )}
         </div>
       </div>
